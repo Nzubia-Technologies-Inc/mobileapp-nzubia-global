@@ -1,0 +1,59 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_stripe/flutter_stripe.dart';
+import 'package:customer_nzubia_global/core/services/payment_service.dart';
+import 'package:customer_nzubia_global/core/network/dio_client.dart';
+
+class StripePaymentService implements PaymentService {
+  final DioClient _dioClient;
+
+  StripePaymentService(this._dioClient);
+
+  @override
+  Future<void> initPaymentSheet({required String amount, required String currency}) async {
+    try {
+      // 1. Create PaymentIntent on the backend
+      final clientSecret = await _createPaymentIntent(amount, currency);
+      
+      // 2. Initialize the payment sheet
+      await Stripe.instance.initPaymentSheet(
+        paymentSheetParameters: SetupPaymentSheetParameters(
+          paymentIntentClientSecret: clientSecret,
+          merchantDisplayName: 'Nzubia',
+          style: ThemeMode.light,
+          returnURL: 'nzubia://payment-success', // Deep Link for 3DS redirect
+        ),
+      );
+    } catch (e) {
+      throw Exception('Failed to initialize payment sheet: $e');
+    }
+  }
+
+  @override
+  Future<void> presentPaymentSheet() async {
+    try {
+      await Stripe.instance.presentPaymentSheet();
+    } catch (e) {
+       // Allow cancellation
+       if (e is StripeException) {
+         throw Exception('Payment failed: ${e.error.localizedMessage}');
+       } else {
+         throw Exception('Payment failed: $e');
+       }
+    }
+  }
+
+  Future<String> _createPaymentIntent(String amount, String currency) async {
+    try {
+      final response = await _dioClient.dio.post(
+        '/payments/create-intent',
+        data: {
+          'amount': (double.parse(amount) * 100).toInt(), // Convert to cents
+          'currency': currency,
+        },
+      );
+      return response.data['clientSecret'];
+    } catch (e) {
+      throw Exception('Backend Payment Intent failed: $e');
+    }
+  }
+}

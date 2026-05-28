@@ -1,0 +1,65 @@
+project: Customer Mobile App (Nzubia Global)
+Version: 1.0.0
+
+[x] 1. Project Initialization
+    [x] 1.1 Update pubspec.yaml with dependencies
+        - flutter_bloc
+        - dio
+        - go_router
+        - hive, hive_flutter
+        - flutter_secure_storage
+        - google_maps_flutter
+        - flutter_stripe
+        - socket_io_client
+        - get_it
+        - image_picker
+        - easy_stepper
+        - flutter_form_builder
+        - google_fonts
+    [x] 1.2 Create Folder Structure (feature-first)
+        - lib/core (network, theme, utils)
+        - lib/config (routes, constants)
+        - lib/features (auth, shipment, tracking, messaging, profile)
+
+[x] 2. Core Setup
+    [x] 2.1 Setup Theme (Google Fonts, Colors)
+    [x] 2.2 Setup Navigation (go_router configuration)
+    [x] 2.3 Setup Network Client (Dio with interceptors)
+    [x] 2.4 Setup State Management (BlocObserver, main provider)
+
+[ ] 3. Authentication (features/auth)
+    [x] 3.1 Splash Screen
+    [x] 3.2 Login Screen (UI + Bloc)
+    [x] 3.3 Register Screen
+    [x] 3.4 OTP Verification Screen
+    [x] 3.5 Profile Setup (Basic Info + Business Logic)
+
+
+[x] 4. Shipment Feature (features/shipment)
+    [ ] 4.1 Create Shipment Wizard
+        - Step 1: Origin & Destination (Maps Integrated)
+        - Step 2: Cargo Details (Camera integration Done)
+        - Step 3: Service Level & Review
+    [x] 4.2 View Quotes (Marketplace)
+        - Quote Listing
+        - Quote Detail BottomSheet
+    [x] 4.3 Checkout / Payment Integration
+
+[ ] 5. Tracking (features/tracking)
+    [x] 5.1 Dashboard (Shipment List)
+    [x] 5.2 Tracking Detail (Vertical Stepper)
+    [ ] 5.3 Map View (Google Maps integration)
+
+[ ] 6. Messaging (features/messaging)
+    [x] 6.1 Chat UI
+    [ ] 6.2 Socket.io Integration)
+
+[ ] 7. Profile & Settings (features/profile)
+    [x] 7.1 User Profile View
+    [x] 7.2 Edit Profile
+    [ ] 7.3 Settings (Notifications, etc)
+
+[ ] 8. Integration & Testing
+    [ ] 8.1 API Integration verification
+    [ ] 8.2 End-to-End Testing
+    [x] 8.3 Branding (App Icon & Splash)

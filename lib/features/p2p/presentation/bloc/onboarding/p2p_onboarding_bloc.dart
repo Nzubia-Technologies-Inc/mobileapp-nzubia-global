@@ -1,0 +1,186 @@
+import 'package:equatable/equatable.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:customer_nzubia_global/features/p2p/domain/models/p2p_courier_profile.dart';
+import 'package:customer_nzubia_global/features/p2p/domain/repositories/p2p_courier_repository.dart';
+import 'package:customer_nzubia_global/features/p2p/domain/repositories/p2p_route_repository.dart';
+
+part 'p2p_onboarding_event.dart';
+part 'p2p_onboarding_state.dart';
+
+/// Keys carried inside `collectedData` that the bloc maps onto courier-apply
+/// and route-create payloads at submit time.
+class _OnboardingKeys {
+  // Courier profile (matches CreateCourierProfileDto on the backend)
+  static const homeLatitude = 'homeLatitude';
+  static const homeLongitude = 'homeLongitude';
+  static const serviceRadiusKm = 'serviceRadiusKm';
+  static const acceptedCategories = 'acceptedCategories';
+
+  // Optional initial route (matches CreateRouteDto)
+  static const destinationCountry = 'destinationCountry';
+  static const destinationCity = 'destinationCity';
+  static const departureDate = 'departureDate';
+  static const returnDate = 'returnDate';
+  static const pickupOrigin = 'pickupOrigin';
+  static const pickupLatitude = 'pickupLatitude';
+  static const pickupLongitude = 'pickupLongitude';
+  static const capacityKg = 'capacityKg';
+  static const acceptedItemCategories = 'acceptedItemCategories';
+  static const routeNotes = 'routeNotes';
+}
+
+class P2pOnboardingBloc extends Bloc<P2pOnboardingEvent, P2pOnboardingState> {
+  final P2pCourierRepository _courierRepo;
+  final P2pRouteRepository _routeRepo;
+
+  P2pOnboardingBloc({
+    required P2pCourierRepository courierRepository,
+    required P2pRouteRepository routeRepository,
+  })  : _courierRepo = courierRepository,
+        _routeRepo = routeRepository,
+        super(const P2pOnboardingState()) {
+    on<P2pOnboardingStarted>(_onStarted);
+    on<P2pOnboardingIdentitySubmitted>(_onIdentitySubmitted);
+    on<P2pOnboardingDocumentsSubmitted>(_onDocumentsSubmitted);
+    on<P2pOnboardingRouteSubmitted>(_onRouteSubmitted);
+    on<P2pOnboardingComplianceSubmitted>(_onComplianceSubmitted);
+    on<P2pOnboardingConfirmSubmit>(_onConfirmSubmit);
+    on<P2pOnboardingReset>(_onReset);
+  }
+
+  void _onStarted(P2pOnboardingStarted event, Emitter<P2pOnboardingState> emit) {
+    emit(const P2pOnboardingState(
+      status: OnboardingStatus.step,
+      stepIndex: 0,
+      collectedData: {},
+    ));
+  }
+
+  void _onIdentitySubmitted(
+    P2pOnboardingIdentitySubmitted event,
+    Emitter<P2pOnboardingState> emit,
+  ) {
+    final merged = Map<String, dynamic>.from(state.collectedData)
+      ..addAll(event.data);
+    emit(state.copyWith(
+      status: OnboardingStatus.step,
+      stepIndex: 2,
+      collectedData: merged,
+    ));
+  }
+
+  void _onDocumentsSubmitted(
+    P2pOnboardingDocumentsSubmitted event,
+    Emitter<P2pOnboardingState> emit,
+  ) {
+    final merged = Map<String, dynamic>.from(state.collectedData)
+      ..addAll(event.data);
+    emit(state.copyWith(
+      status: OnboardingStatus.step,
+      stepIndex: 3,
+      collectedData: merged,
+    ));
+  }
+
+  void _onRouteSubmitted(
+    P2pOnboardingRouteSubmitted event,
+    Emitter<P2pOnboardingState> emit,
+  ) {
+    final merged = Map<String, dynamic>.from(state.collectedData)
+      ..addAll(event.data);
+    emit(state.copyWith(
+      status: OnboardingStatus.step,
+      stepIndex: 4,
+      collectedData: merged,
+    ));
+  }
+
+  void _onComplianceSubmitted(
+    P2pOnboardingComplianceSubmitted event,
+    Emitter<P2pOnboardingState> emit,
+  ) {
+    final merged = Map<String, dynamic>.from(state.collectedData)
+      ..addAll(event.data);
+    emit(state.copyWith(
+      status: OnboardingStatus.step,
+      stepIndex: 5,
+      collectedData: merged,
+    ));
+  }
+
+  Future<void> _onConfirmSubmit(
+    P2pOnboardingConfirmSubmit event,
+    Emitter<P2pOnboardingState> emit,
+  ) async {
+    emit(state.copyWith(status: OnboardingStatus.submitting));
+    try {
+      final profilePayload = _extractCourierData(state.collectedData);
+      final profile = await _courierRepo.applyAsCourier(profilePayload);
+
+      // If route data was collected (optional during onboarding), also create
+      // the initial route in DRAFT. Failure here is non-fatal so the courier
+      // is still onboarded — they can publish a route from the dashboard.
+      final routeData = _extractRouteData(state.collectedData);
+      if (routeData.isNotEmpty) {
+        try {
+          await _routeRepo.createRoute(routeData);
+        } catch (_) {
+          // intentionally swallowed
+        }
+      }
+
+      emit(state.copyWith(
+        status: OnboardingStatus.success,
+        profile: profile,
+      ));
+    } catch (e) {
+      emit(state.copyWith(
+        status: OnboardingStatus.failure,
+        errorMessage: e.toString(),
+        stepIndex: 5,
+      ));
+    }
+  }
+
+  void _onReset(P2pOnboardingReset event, Emitter<P2pOnboardingState> emit) {
+    emit(const P2pOnboardingState());
+  }
+
+  Map<String, dynamic> _extractCourierData(Map<String, dynamic> data) {
+    const keys = [
+      _OnboardingKeys.homeLatitude,
+      _OnboardingKeys.homeLongitude,
+      _OnboardingKeys.serviceRadiusKm,
+      _OnboardingKeys.acceptedCategories,
+    ];
+    return {
+      for (final k in keys)
+        if (data[k] != null) k: data[k],
+    };
+  }
+
+  Map<String, dynamic> _extractRouteData(Map<String, dynamic> data) {
+    const required = [
+      _OnboardingKeys.destinationCountry,
+      _OnboardingKeys.destinationCity,
+      _OnboardingKeys.departureDate,
+      _OnboardingKeys.pickupOrigin,
+      _OnboardingKeys.capacityKg,
+    ];
+    final hasRequired = required.every((k) => data[k] != null);
+    if (!hasRequired) return const {};
+
+    const optional = [
+      _OnboardingKeys.returnDate,
+      _OnboardingKeys.pickupLatitude,
+      _OnboardingKeys.pickupLongitude,
+      _OnboardingKeys.acceptedItemCategories,
+      _OnboardingKeys.routeNotes,
+    ];
+
+    return {
+      for (final k in [...required, ...optional])
+        if (data[k] != null) k: data[k],
+    };
+  }
+}

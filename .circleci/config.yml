@@ -1,0 +1,169 @@
+version: 2.1
+
+orbs:
+  android: circleci/android@2.5.0
+
+jobs:
+  # Android Deployment Job
+  deploy-android:
+    docker:
+      - image: cimg/android:2024.01.1
+    resource_class: large
+    steps:
+      - checkout
+      
+      # Install Flutter
+      - run:
+          name: Install Flutter
+          command: |
+            git clone https://github.com/flutter/flutter.git -b stable --depth 1
+            echo 'export PATH="$PATH:$HOME/project/flutter/bin"' >> $BASH_ENV
+            source $BASH_ENV
+            flutter doctor
+      
+      # Install Ruby and Fastlane
+      - run:
+          name: Install Fastlane
+          command: |
+            sudo apt-get update
+            sudo apt-get install -y ruby-full
+            sudo gem install fastlane -NV
+      
+      # Setup Android signing
+      - run:
+          name: Setup Android Keystore
+          command: |
+            cd customer-nzubia-global/android
+            # Hardcoded Base64 for Keystore
+            echo "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" | base64 -d > nzubia-release-key.jks
+            echo "storePassword=Password@2026?" > key.properties
+            echo "keyPassword=Password@2026?" >> key.properties
+            echo "keyAlias=nzubia-key" >> key.properties
+            echo "storeFile=nzubia-release-key.jks" >> key.properties
+      
+      # Setup Google Play Service Account (PLACEHOLDER - Provide JSON content)
+      - run:
+          name: Setup Google Play Service Account
+          command: |
+            cd customer-nzubia-global/android/fastlane
+            # TODO: Replace with actual JSON content from Google Cloud Console
+            echo '{"type": "service_account", "project_id": "...", ...}' > google-play-service-account.json
+      
+      # Deploy to Play Store
+      - run:
+          name: Deploy to Play Store
+          command: |
+            cd customer-nzubia-global/android
+            fastlane internal
+      
+      # Store artifacts
+      - store_artifacts:
+          path: customer-nzubia-global/build/app/outputs/bundle/release/app-release.aab
+          destination: app-release.aab
+
+  # iOS Deployment Job
+  deploy-ios:
+    macos:
+      xcode: 15.1.0
+    resource_class: macos.m1.medium.gen1
+    steps:
+      - checkout
+      
+      # Install Flutter
+      - run:
+          name: Install Flutter
+          command: |
+            git clone https://github.com/flutter/flutter.git -b stable --depth 1
+            echo 'export PATH="$PATH:$HOME/project/flutter/bin"' >> $BASH_ENV
+            source $BASH_ENV
+            flutter doctor
+      
+      # Install Fastlane
+      - run:
+          name: Install Fastlane
+          command: |
+            sudo gem install fastlane -NV
+      
+      # Setup App Store Connect API Key (PLACEHOLDERS)
+      - run:
+          name: Setup App Store Connect API
+          command: |
+            cd customer-nzubia-global/ios/fastlane
+            # TODO: Replace XXXXXX with actual values from App Store Connect
+            echo "APP_STORE_CONNECT_API_KEY_ID=XXXXXX" > .env
+            echo "APP_STORE_CONNECT_ISSUER_ID=XXXXXX" >> .env
+            echo "APP_STORE_CONNECT_API_KEY_CONTENT=-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----" >> .env
+      
+      # Create ExportOptions.plist
+      - run:
+          name: Create Export Options
+          command: |
+            cd customer-nzubia-global/ios
+            cat > ExportOptions.plist << EOF
+            <?xml version="1.0" encoding="UTF-8"?>
+            <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+            <plist version="1.0">
+            <dict>
+                <key>method</key>
+                <string>app-store</string>
+                <key>uploadBitcode</key>
+                <false/>
+                <key>uploadSymbols</key>
+                <true/>
+                <key>compileBitcode</key>
+                <false/>
+            </dict>
+            </plist>
+            EOF
+      
+      # Deploy to TestFlight
+      - run:
+          name: Deploy to TestFlight
+          command: |
+            cd customer-nzubia-global/ios
+            fastlane beta
+      
+      # Store artifacts
+      - store_artifacts:
+          path: customer-nzubia-global/build/ios/ipa/customer_nzubia_global.ipa
+          destination: app-release.ipa
+
+workflows:
+  # Deploy on push to specific branches
+  deploy-mobile:
+    jobs:
+      # Android deployment
+      - deploy-android:
+          filters:
+            branches:
+              only:
+                - development
+                - production
+          # Context contains any remaining secrets if moved there later
+          # context: mobile-deployment
+      
+      # iOS deployment (only on macOS)
+      - deploy-ios:
+          filters:
+            branches:
+              only:
+                - development
+                - production
+          # context: mobile-deployment
+  
+  # Manual deployment workflow
+  manual-deploy:
+    jobs:
+      - hold-android:
+          type: approval
+      - deploy-android:
+          requires:
+            - hold-android
+          # context: mobile-deployment
+      
+      - hold-ios:
+          type: approval
+      - deploy-ios:
+          requires:
+            - hold-ios
+          # context: mobile-deployment

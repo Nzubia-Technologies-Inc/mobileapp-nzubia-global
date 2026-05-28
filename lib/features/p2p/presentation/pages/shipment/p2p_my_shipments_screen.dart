@@ -1,0 +1,355 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
+import 'package:get_it/get_it.dart';
+import 'package:intl/intl.dart';
+import 'package:customer_nzubia_global/core/theme/app_theme.dart';
+import 'package:customer_nzubia_global/features/p2p/domain/enums/p2p_enums.dart';
+import 'package:customer_nzubia_global/features/p2p/domain/models/p2p_shipment_request.dart';
+import 'package:customer_nzubia_global/features/p2p/presentation/bloc/shipment/p2p_shipment_bloc.dart';
+
+class P2pMyShipmentsScreen extends StatelessWidget {
+  const P2pMyShipmentsScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return BlocProvider(
+      create: (_) => GetIt.instance<P2pShipmentBloc>()
+        ..add(const P2pShipmentListRequested()),
+      child: const _MyShipmentsView(),
+    );
+  }
+}
+
+class _MyShipmentsView extends StatelessWidget {
+  const _MyShipmentsView();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Scaffold(
+      backgroundColor: theme.scaffoldBackgroundColor,
+      appBar: AppBar(
+        backgroundColor: theme.colorScheme.surface,
+        elevation: 0,
+        leading: const BackButton(),
+        title: const Text('My Shipment Requests'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh_outlined),
+            onPressed: () => context
+                .read<P2pShipmentBloc>()
+                .add(const P2pShipmentListRequested()),
+          ),
+        ],
+      ),
+      body: BlocBuilder<P2pShipmentBloc, P2pShipmentState>(
+        builder: (context, state) {
+          switch (state.status) {
+            case P2pShipmentStatus.initial:
+            case P2pShipmentStatus.loading:
+              return const Center(
+                child: CircularProgressIndicator(color: AppTheme.primaryColor),
+              );
+            case P2pShipmentStatus.failure:
+              return _ErrorPanel(
+                message: state.errorMessage ?? 'Failed to load shipments',
+                onRetry: () => context
+                    .read<P2pShipmentBloc>()
+                    .add(const P2pShipmentListRequested()),
+              );
+            case P2pShipmentStatus.success:
+              if (state.requests.isEmpty) {
+                return _EmptyPanel(
+                  onSend: () => context.push('/p2p/shipment/create'),
+                );
+              }
+              return RefreshIndicator(
+                color: AppTheme.primaryColor,
+                onRefresh: () async => context
+                    .read<P2pShipmentBloc>()
+                    .add(const P2pShipmentListRequested()),
+                child: ListView.separated(
+                  padding: const EdgeInsets.all(16),
+                  itemCount: state.requests.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 12),
+                  itemBuilder: (context, i) =>
+                      _ShipmentCard(shipment: state.requests[i]),
+                ),
+              );
+          }
+        },
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => context.push('/p2p/shipment/create'),
+        icon: const Icon(Icons.add),
+        label: const Text('New Request'),
+        backgroundColor: AppTheme.primaryColor,
+        foregroundColor: Colors.white,
+      ),
+    );
+  }
+}
+
+class _ShipmentCard extends StatelessWidget {
+  final P2pShipmentRequest shipment;
+  const _ShipmentCard({required this.shipment});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final dateFmt = DateFormat('dd MMM yyyy');
+    final (statusColor, statusLabel) = _statusStyle(shipment.status);
+
+    return GestureDetector(
+      onTap: () => context.push('/p2p/shipment/${shipment.id}'),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surface,
+          borderRadius: BorderRadius.circular(14),
+          border:
+              Border.all(color: theme.colorScheme.outline.withOpacity(0.5)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withAlpha(8),
+              blurRadius: 4,
+              offset: const Offset(0, 1),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 38,
+                  height: 38,
+                  decoration: BoxDecoration(
+                    color: AppTheme.primaryColor.withAlpha(20),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(Icons.inventory_2_outlined,
+                      color: AppTheme.primaryColor, size: 20),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        shipment.itemDescription,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                            fontWeight: FontWeight.w600),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      Text(
+                        '${shipment.destinationCity}, ${shipment.destinationCountry}',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                            color:
+                                theme.colorScheme.onSurface.withOpacity(0.55)),
+                      ),
+                    ],
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 9, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: statusColor.withAlpha(25),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    statusLabel,
+                    style: TextStyle(
+                      color: statusColor,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Icon(Icons.scale_outlined,
+                    size: 13,
+                    color: theme.colorScheme.onSurface.withOpacity(0.45)),
+                const SizedBox(width: 4),
+                Text(
+                  '${shipment.weightKg.toStringAsFixed(1)} kg',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurface.withOpacity(0.55)),
+                ),
+                const SizedBox(width: 14),
+                Icon(Icons.attach_money,
+                    size: 13,
+                    color: theme.colorScheme.onSurface.withOpacity(0.45)),
+                Text(
+                  '\$${shipment.declaredValueUsd.toStringAsFixed(0)} declared',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurface.withOpacity(0.55)),
+                ),
+                const Spacer(),
+                if (shipment.createdAt != null)
+                  Text(
+                    dateFmt.format(shipment.createdAt!),
+                    style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurface.withOpacity(0.4),
+                        fontSize: 11),
+                  ),
+              ],
+            ),
+            // Hint when there's an action needed
+            if (shipment.status == ShipmentRequestStatus.open) ...[
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Icon(Icons.info_outline,
+                      size: 13, color: Colors.blue[600]),
+                  const SizedBox(width: 4),
+                  Text(
+                    'Tap to see courier responses',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                        color: Colors.blue[600], fontSize: 11),
+                  ),
+                ],
+              ),
+            ],
+            if (shipment.status == ShipmentRequestStatus.matched ||
+                shipment.status == ShipmentRequestStatus.reserved) ...[
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Icon(Icons.handshake_outlined,
+                      size: 13, color: Colors.green[700]),
+                  const SizedBox(width: 4),
+                  Text(
+                    'Matched! Tap to coordinate handoff',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                        color: Colors.green[700],
+                        fontSize: 11,
+                        fontWeight: FontWeight.w500),
+                  ),
+                ],
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  (Color, String) _statusStyle(ShipmentRequestStatus status) {
+    switch (status) {
+      case ShipmentRequestStatus.draft:
+        return (Colors.grey[600]!, 'Draft');
+      case ShipmentRequestStatus.open:
+        return (Colors.blue[600]!, 'Open');
+      case ShipmentRequestStatus.matched:
+        return (Colors.green[600]!, 'Matched');
+      case ShipmentRequestStatus.reserved:
+        return (Colors.green[700]!, 'Reserved');
+      case ShipmentRequestStatus.handoffPending:
+        return (Colors.orange[700]!, 'Handoff Pending');
+      case ShipmentRequestStatus.inTransit:
+        return (AppTheme.primaryColor, 'In Transit');
+      case ShipmentRequestStatus.delivered:
+        return (Colors.teal[600]!, 'Delivered');
+      case ShipmentRequestStatus.completed:
+        return (Colors.teal[700]!, 'Completed');
+      case ShipmentRequestStatus.cancelled:
+        return (Colors.red[600]!, 'Cancelled');
+      case ShipmentRequestStatus.disputed:
+        return (Colors.red[700]!, 'Disputed');
+      case ShipmentRequestStatus.rejected:
+        return (Colors.red[800]!, 'Rejected');
+    }
+  }
+}
+
+class _EmptyPanel extends StatelessWidget {
+  final VoidCallback onSend;
+  const _EmptyPanel({required this.onSend});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.inbox_outlined,
+                size: 64, color: theme.colorScheme.outline),
+            const SizedBox(height: 16),
+            Text('No shipment requests yet',
+                style: theme.textTheme.titleMedium),
+            const SizedBox(height: 8),
+            Text(
+              'Send your first package and track everything here.',
+              style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurface.withOpacity(0.5)),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton.icon(
+              onPressed: onSend,
+              icon: const Icon(Icons.add),
+              label: const Text('Send a Package'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.primaryColor,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12)),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ErrorPanel extends StatelessWidget {
+  final String message;
+  final VoidCallback onRetry;
+  const _ErrorPanel({required this.message, required this.onRetry});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.error_outline,
+                size: 64, color: theme.colorScheme.outline),
+            const SizedBox(height: 16),
+            Text(message,
+                style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurface.withOpacity(0.5)),
+                textAlign: TextAlign.center),
+            const SizedBox(height: 24),
+            ElevatedButton.icon(
+              onPressed: onRetry,
+              icon: const Icon(Icons.refresh),
+              label: const Text('Try Again'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.primaryColor,
+                foregroundColor: Colors.white,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
