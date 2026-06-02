@@ -1144,6 +1144,57 @@ class _RouteManageTile extends StatelessWidget {
               ),
             ),
           ],
+          if (route.status == RouteStatus.published &&
+              route.departureDate.isBefore(DateTime.now())) ...[
+            const SizedBox(height: 10),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () async {
+                  final confirmed = await showDialog<bool>(
+                    context: context,
+                    builder: (ctx) => AlertDialog(
+                      title: const Text('Archive Route'),
+                      content: const Text(
+                        'The travel date for this route has passed. Archive it to remove it from the marketplace?',
+                      ),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(ctx, false),
+                          child: const Text('Cancel'),
+                        ),
+                        ElevatedButton(
+                          onPressed: () => Navigator.pop(ctx, true),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.grey[700],
+                            foregroundColor: Colors.white,
+                          ),
+                          child: const Text('Archive'),
+                        ),
+                      ],
+                    ),
+                  );
+                  if (confirmed == true && context.mounted) {
+                    context.read<CourierDashboardBloc>().add(
+                          CourierDashboardRouteArchiveRequested(
+                              routeId: route.id),
+                        );
+                  }
+                },
+                icon: const Icon(Icons.archive_outlined, size: 16),
+                label: const Text('Archive Route',
+                    style: TextStyle(fontWeight: FontWeight.w600)),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.grey[700],
+                  side: BorderSide(color: Colors.grey[400]!),
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10)),
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );

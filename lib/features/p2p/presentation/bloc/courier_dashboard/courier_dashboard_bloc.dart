@@ -31,6 +31,7 @@ class CourierDashboardBloc
     on<CourierDashboardRoutePublishRequested>(_onRoutePublishRequested);
     on<CourierDashboardRequestAccepted>(_onRequestAccepted);
     on<CourierDashboardRequestDeclined>(_onRequestDeclined);
+    on<CourierDashboardRouteArchiveRequested>(_onRouteArchiveRequested);
     on<CourierDashboardLocationUpdated>(_onLocationUpdated);
   }
 
@@ -113,6 +114,40 @@ class CourierDashboardBloc
         orElse: () => updated,
       );
       emit(state.copyWith(myRoutes: newRoutes, activeRoute: activeRoute));
+    } catch (e) {
+      emit(state.copyWith(
+        status: CourierDashboardStatus.failure,
+        errorMessage: e.toString(),
+      ));
+    }
+  }
+
+  Future<void> _onRouteArchiveRequested(
+    CourierDashboardRouteArchiveRequested event,
+    Emitter<CourierDashboardState> emit,
+  ) async {
+    try {
+      final updated = await _routeRepo.updateRouteStatus(
+          event.routeId, RouteStatus.removed);
+      final newRoutes = state.myRoutes
+          .map((r) => r.id == updated.id ? updated : r)
+          .toList();
+      P2pRoute? newActiveRoute;
+      for (final r in newRoutes) {
+        if (r.status == RouteStatus.published) {
+          newActiveRoute = r;
+          break;
+        }
+      }
+      // Build state directly so activeRoute can be cleared to null.
+      emit(CourierDashboardState(
+        status: state.status,
+        profile: state.profile,
+        activeRoute: newActiveRoute,
+        myRoutes: newRoutes,
+        pendingRequests: state.pendingRequests,
+        activeShipments: state.activeShipments,
+      ));
     } catch (e) {
       emit(state.copyWith(
         status: CourierDashboardStatus.failure,

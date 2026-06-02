@@ -38,6 +38,11 @@ class CourierDashboardRequestDeclined extends CourierDashboardEvent {
   });
 }
 
+class CourierDashboardRouteArchiveRequested extends CourierDashboardEvent {
+  final String routeId;
+  const CourierDashboardRouteArchiveRequested({required this.routeId});
+}
+
 class CourierDashboardLocationUpdated extends CourierDashboardEvent {
   final double latitude;
   final double longitude;
