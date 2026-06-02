@@ -11,8 +11,9 @@ import 'package:customer_nzubia_global/features/p2p/domain/repositories/p2p_ship
 
 class CourierOfferSheet extends StatefulWidget {
   final P2pShipmentRequest shipment;
+  final VoidCallback? onSubmitted;
 
-  const CourierOfferSheet({super.key, required this.shipment});
+  const CourierOfferSheet({super.key, required this.shipment, this.onSubmitted});
 
   @override
   State<CourierOfferSheet> createState() => _CourierOfferSheetState();
@@ -82,6 +83,7 @@ class _CourierOfferSheetState extends State<CourierOfferSheet> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Offer submitted!')),
       );
+      widget.onSubmitted?.call();
       Navigator.of(context).pop();
     } catch (e) {
       if (!mounted) return;

@@ -1,4 +1,5 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:customer_nzubia_global/features/p2p/data/services/p2p_payment_tracker.dart';
 import 'package:customer_nzubia_global/features/p2p/domain/enums/p2p_enums.dart';
 import 'package:customer_nzubia_global/features/p2p/domain/models/p2p_courier_request.dart';
 import 'package:customer_nzubia_global/features/p2p/domain/models/p2p_offer.dart';
@@ -35,9 +36,30 @@ class P2pShipmentBloc extends Bloc<P2pShipmentEvent, P2pShipmentState> {
     emit(state.copyWith(status: P2pShipmentStatus.loading));
     try {
       final requests = await _repository.listRequests();
+      final openRequests = requests
+          .where((request) => request.status == ShipmentRequestStatus.open)
+          .toList(growable: false);
+      final counts = <String, int>{};
+      if (openRequests.isNotEmpty) {
+        final results = await Future.wait(
+          openRequests.map((request) async {
+            try {
+              final offers = await _repository.listOffers(request.id);
+              final activeCount = offers.where((offer) {
+                return offer.status == OfferStatus.proposed;
+              }).length;
+              return MapEntry(request.id, activeCount);
+            } catch (_) {
+              return MapEntry(request.id, 0);
+            }
+          }),
+        );
+        counts.addEntries(results);
+      }
       emit(state.copyWith(
         status: P2pShipmentStatus.success,
         requests: requests,
+        courierRequestCounts: counts,
       ));
     } catch (e) {
       emit(_fail(e));
@@ -156,6 +178,15 @@ class P2pShipmentBloc extends Bloc<P2pShipmentEvent, P2pShipmentState> {
     emit(state.copyWith(status: P2pShipmentStatus.loading));
     try {
       final accepted = await _repository.acceptOffer(event.offerId);
+      // Persist pending payment so re-entry can route back to payment screen.
+      if (event.shipmentId != null &&
+          accepted.offerAmountUsd != null &&
+          accepted.offerAmountUsd! > 0) {
+        P2pPaymentTracker.savePendingPayment(
+          event.shipmentId!,
+          accepted.offerAmountUsd!,
+        );
+      }
       P2pShipmentState next;
       if (event.shipmentId != null) {
         final refreshed = await _repository.getRequest(event.shipmentId!);

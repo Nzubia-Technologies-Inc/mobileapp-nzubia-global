@@ -8,6 +8,7 @@ class P2pShipmentState {
   final P2pShipmentRequest? selectedRequest;
   final List<P2pOffer> offers;
   final List<P2pRouteFeedItem> matches;
+  final Map<String, int> courierRequestCounts;
 
   /// Courier requests the seeker sent for the currently selected shipment.
   final List<P2pCourierRequest> courierRequests;
@@ -24,6 +25,7 @@ class P2pShipmentState {
     this.selectedRequest,
     this.offers = const [],
     this.matches = const [],
+    this.courierRequestCounts = const {},
     this.courierRequests = const [],
     this.errorMessage,
     this.pendingPaymentClientSecret,
@@ -36,6 +38,7 @@ class P2pShipmentState {
     P2pShipmentRequest? selectedRequest,
     List<P2pOffer>? offers,
     List<P2pRouteFeedItem>? matches,
+    Map<String, int>? courierRequestCounts,
     List<P2pCourierRequest>? courierRequests,
     String? errorMessage,
     String? pendingPaymentClientSecret,
@@ -48,6 +51,7 @@ class P2pShipmentState {
       selectedRequest: selectedRequest ?? this.selectedRequest,
       offers: offers ?? this.offers,
       matches: matches ?? this.matches,
+        courierRequestCounts: courierRequestCounts ?? this.courierRequestCounts,
       courierRequests: courierRequests ?? this.courierRequests,
       errorMessage: errorMessage ?? this.errorMessage,
       pendingPaymentClientSecret: clearPendingPayment

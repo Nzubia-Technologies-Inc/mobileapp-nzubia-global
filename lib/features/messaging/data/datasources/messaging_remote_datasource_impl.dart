@@ -31,9 +31,9 @@ class MessagingRemoteDatasourceImpl implements MessagingRemoteDatasource {
     _initialized = true;
 
     // Remove any existing listener first just in case
-    socketClient.socket.off('receive_message');
+    socketClient.socket.off('newMessage');
 
-    socketClient.socket.on('receive_message', (data) {
+    socketClient.socket.on('newMessage', (data) {
       if (data != null) {
         try {
           final message = _mapToEntity(Map<String, dynamic>.from(data));
@@ -83,7 +83,7 @@ class MessagingRemoteDatasourceImpl implements MessagingRemoteDatasource {
   @override
   Future<List<MessageEntity>> getMessages(String chatId) async {
     try {
-      final response = await dioClient.dio.get('/chat/history', queryParameters: {'userId': chatId});
+      final response = await dioClient.dio.get('/chat/rooms/$chatId/messages');
       final data = response.data as List;
       return data.map((e) => _mapToEntity(e)).toList();
     } catch (e) {
@@ -92,20 +92,26 @@ class MessagingRemoteDatasourceImpl implements MessagingRemoteDatasource {
   }
 
   @override
+  Future<void> joinRoom(String roomId) async {
+    if (!socketClient.socket.connected) return;
+    socketClient.socket.emit('joinRoom', roomId);
+  }
+
+  @override
   Future<void> sendMessage(String chatId, String content, {String? filePath}) async {
     try {
       if (filePath != null) {
-        // Send with file attachment
+        // Upload file first, then send message with the returned URL as content
         final formData = FormData.fromMap({
-          'receiverId': chatId,
-          'content': content,
           'file': await MultipartFile.fromFile(filePath, filename: filePath.split('/').last),
         });
-        await dioClient.dio.post('/chat/message', data: formData);
+        final uploadResp = await dioClient.dio.post('/files/upload', data: formData);
+        final fileUrl = uploadResp.data['url'] as String? ?? filePath;
+        await dioClient.dio.post('/chat/rooms/$chatId/messages', data: {
+          'content': fileUrl,
+        });
       } else {
-        // Send text-only message
-        await dioClient.dio.post('/chat/message', data: {
-          'receiverId': chatId,
+        await dioClient.dio.post('/chat/rooms/$chatId/messages', data: {
           'content': content,
         });
       }

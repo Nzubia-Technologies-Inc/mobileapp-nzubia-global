@@ -1,0 +1,41 @@
+import 'package:hive/hive.dart';
+
+/// Tracks mock payment state for P2P shipments using the already-open
+/// Hive 'settings' box. All methods are synchronous.
+///
+/// Lifecycle:
+///   1. savePendingPayment() — called when offer is accepted (BLoC)
+///   2. getPendingAmount()   — called on re-entry to build payment screen
+///   3. markPaymentComplete()— called when mock payment succeeds
+class P2pPaymentTracker {
+  static Box get _box => Hive.box('settings');
+
+  static const _donePrefix = 'p2p_pay_done_';
+  static const _amountPrefix = 'p2p_pay_amount_';
+
+  static void savePendingPayment(String shipmentId, double amountUsd) {
+    _box.put('$_amountPrefix$shipmentId', amountUsd);
+    _box.put('$_donePrefix$shipmentId', false);
+  }
+
+  static bool hasCompletedPayment(String shipmentId) =>
+      _box.get('$_donePrefix$shipmentId', defaultValue: false) as bool;
+
+  static void markPaymentComplete(String shipmentId) {
+    _box.put('$_donePrefix$shipmentId', true);
+    _box.delete('$_amountPrefix$shipmentId');
+  }
+
+  /// Returns the pending amount, or null if payment was already done or
+  /// no offer has been accepted yet for this shipment.
+  static double? getPendingAmount(String shipmentId) {
+    if (hasCompletedPayment(shipmentId)) return null;
+    final val = _box.get('$_amountPrefix$shipmentId');
+    if (val is double) return val;
+    if (val is int) return val.toDouble();
+    return null;
+  }
+
+  static bool hasPaymentPending(String shipmentId) =>
+      getPendingAmount(shipmentId) != null;
+}

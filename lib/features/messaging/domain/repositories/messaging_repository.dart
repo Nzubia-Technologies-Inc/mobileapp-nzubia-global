@@ -5,6 +5,7 @@ import 'package:customer_nzubia_global/features/auth/domain/entities/user_entity
 
 abstract class MessagingRepository {
   Future<void> initialize();
+  Future<void> joinRoom(String roomId);
   Future<List<ChatEntity>> getChats();
   Future<List<MessageEntity>> getMessages(String chatId);
   Future<void> sendMessage(String chatId, String content, {String? filePath});

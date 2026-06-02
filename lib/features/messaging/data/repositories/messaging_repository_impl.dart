@@ -45,6 +45,11 @@ class MessagingRepositoryImpl implements MessagingRepository {
   }
 
   @override
+  Future<void> joinRoom(String roomId) async {
+    await remoteDatasource.joinRoom(roomId);
+  }
+
+  @override
   Future<List<ChatEntity>> getChats() async {
     await _ensureAuth();
     if (_currentUserId == null) return [];

@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:get_it/get_it.dart';
 import 'package:intl/intl.dart';
 import 'package:customer_nzubia_global/core/theme/app_theme.dart';
+import 'package:customer_nzubia_global/features/p2p/data/services/p2p_payment_tracker.dart';
 import 'package:customer_nzubia_global/features/p2p/domain/enums/p2p_enums.dart';
 import 'package:customer_nzubia_global/features/p2p/domain/models/p2p_shipment_request.dart';
 import 'package:customer_nzubia_global/features/p2p/presentation/bloc/shipment/p2p_shipment_bloc.dart';
@@ -75,7 +76,11 @@ class _MyShipmentsView extends StatelessWidget {
                   itemCount: state.requests.length,
                   separatorBuilder: (_, __) => const SizedBox(height: 12),
                   itemBuilder: (context, i) =>
-                      _ShipmentCard(shipment: state.requests[i]),
+                      _ShipmentCard(
+                    shipment: state.requests[i],
+                    courierRequestCount:
+                        state.courierRequestCounts[state.requests[i].id] ?? 0,
+                  ),
                 ),
               );
           }
@@ -94,7 +99,11 @@ class _MyShipmentsView extends StatelessWidget {
 
 class _ShipmentCard extends StatelessWidget {
   final P2pShipmentRequest shipment;
-  const _ShipmentCard({required this.shipment});
+  final int courierRequestCount;
+  const _ShipmentCard({
+    required this.shipment,
+    required this.courierRequestCount,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -103,7 +112,7 @@ class _ShipmentCard extends StatelessWidget {
     final (statusColor, statusLabel) = _statusStyle(shipment.status);
 
     return GestureDetector(
-      onTap: () => context.push(_routeForStatus(shipment)),
+      onTap: () => _navigateForStatus(context, shipment),
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
@@ -171,6 +180,11 @@ class _ShipmentCard extends StatelessWidget {
                     ),
                   ),
                 ),
+                if (shipment.status == ShipmentRequestStatus.open &&
+                    courierRequestCount > 0) ...[
+                  const SizedBox(width: 8),
+                  _CountBadge(count: courierRequestCount),
+                ],
               ],
             ),
             const SizedBox(height: 10),
@@ -222,20 +236,36 @@ class _ShipmentCard extends StatelessWidget {
             ],
             if (shipment.status == ShipmentRequestStatus.matched) ...[
               const SizedBox(height: 8),
-              Row(
-                children: [
-                  Icon(Icons.description_outlined,
-                      size: 13, color: Colors.green[700]),
-                  const SizedBox(width: 4),
-                  Text(
-                    'Matched! Tap to sign the waiver',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                        color: Colors.green[700],
+              Builder(builder: (ctx) {
+                final paymentPending =
+                    P2pPaymentTracker.hasPaymentPending(shipment.id);
+                return Row(
+                  children: [
+                    Icon(
+                      paymentPending
+                          ? Icons.payment_outlined
+                          : Icons.description_outlined,
+                      size: 13,
+                      color: paymentPending
+                          ? AppTheme.errorColor
+                          : Colors.green[700],
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      paymentPending
+                          ? 'Payment required — tap to complete'
+                          : 'Matched! Tap to sign the waiver',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: paymentPending
+                            ? AppTheme.errorColor
+                            : Colors.green[700],
                         fontSize: 11,
-                        fontWeight: FontWeight.w500),
-                  ),
-                ],
-              ),
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                );
+              }),
             ],
             if (shipment.status == ShipmentRequestStatus.reserved) ...[
               const SizedBox(height: 8),
@@ -260,24 +290,40 @@ class _ShipmentCard extends StatelessWidget {
     );
   }
 
-  String _routeForStatus(P2pShipmentRequest s) {
+  void _navigateForStatus(BuildContext context, P2pShipmentRequest s) {
     switch (s.status) {
       case ShipmentRequestStatus.open:
       case ShipmentRequestStatus.draft:
-        return '/p2p/shipment/${s.id}/offers';
+        context.push('/p2p/shipment/${s.id}/offers');
+        break;
       case ShipmentRequestStatus.matched:
-        return '/p2p/shipment/${s.id}/waiver';
+        // If payment hasn't been completed yet, send the seeker back to
+        // the payment screen rather than skipping straight to the waiver.
+        final pendingAmount = P2pPaymentTracker.getPendingAmount(s.id);
+        if (pendingAmount != null && pendingAmount > 0) {
+          context.push(
+            '/p2p/shipment/${s.id}/payment',
+            extra: {
+              'clientSecret': 'mock_${s.id}',
+              'amountUsd': pendingAmount,
+            },
+          );
+        } else {
+          context.push('/p2p/shipment/${s.id}/waiver');
+        }
+        break;
       case ShipmentRequestStatus.reserved:
-        return '/p2p/shipment/${s.id}/handoff';
       case ShipmentRequestStatus.handoffPending:
-        return '/p2p/shipment/${s.id}/handoff';
+        context.push('/p2p/shipment/${s.id}/handoff');
+        break;
       case ShipmentRequestStatus.inTransit:
       case ShipmentRequestStatus.delivered:
       case ShipmentRequestStatus.completed:
       case ShipmentRequestStatus.disputed:
-        return '/p2p/shipment/${s.id}/tracking';
+        context.push('/p2p/shipment/${s.id}/tracking');
+        break;
       default:
-        return '/p2p/shipment/${s.id}';
+        context.push('/p2p/shipment/${s.id}');
     }
   }
 
@@ -306,6 +352,33 @@ class _ShipmentCard extends StatelessWidget {
       case ShipmentRequestStatus.rejected:
         return (Colors.red[800]!, 'Rejected');
     }
+  }
+}
+
+class _CountBadge extends StatelessWidget {
+  final int count;
+
+  const _CountBadge({required this.count});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+      decoration: BoxDecoration(
+        color: Colors.orange.withAlpha(30),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.orange.withAlpha(80)),
+      ),
+      child: Text(
+        '$count',
+        style: theme.textTheme.bodySmall?.copyWith(
+          color: Colors.orange[800],
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+    );
   }
 }
 

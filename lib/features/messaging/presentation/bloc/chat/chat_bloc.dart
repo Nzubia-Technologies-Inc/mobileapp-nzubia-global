@@ -66,13 +66,16 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
 
   Future<void> _onLoadMessages(LoadMessages event, Emitter<ChatState> emit) async {
     emit(state.copyWith(messageStatus: ChatStatus.loading));
-    
+
     // Cancel previous stream subscription for messages if any
     await _chatMessagesSubscription?.cancel();
-    
+
+    // Join the socket room so real-time messages are received
+    await _messagingRepository.joinRoom(event.chatId);
+
     try {
       _chatMessagesSubscription = _messagingRepository.getMessagesStream(event.chatId).listen((messages) {
-         add(MessagesUpdated(messages)); 
+         add(MessagesUpdated(messages));
       });
     } catch (e) {
       emit(state.copyWith(

@@ -18,6 +18,7 @@ class _CourierMatchedShipmentsScreenState
     extends State<CourierMatchedShipmentsScreen> {
   final _repo = GetIt.instance<P2pShipmentRepository>();
   List<P2pShipmentRequest> _items = [];
+  final Set<String> _submittedOfferShipmentIds = {};
   bool _loading = true;
   String? _error;
   Timer? _pollTimer;
@@ -134,7 +135,17 @@ class _CourierMatchedShipmentsScreenState
         itemCount: _items.length,
         separatorBuilder: (_, __) => const SizedBox(height: 12),
         itemBuilder: (context, index) =>
-            _ShipmentCard(shipment: _items[index], onOfferSent: _load),
+            _ShipmentCard(
+          shipment: _items[index],
+          hasSubmittedOffer:
+              _submittedOfferShipmentIds.contains(_items[index].id),
+          onOfferSent: () {
+            setState(() {
+              _submittedOfferShipmentIds.add(_items[index].id);
+            });
+            _load();
+          },
+        ),
       ),
     );
   }
@@ -143,8 +154,13 @@ class _CourierMatchedShipmentsScreenState
 class _ShipmentCard extends StatelessWidget {
   final P2pShipmentRequest shipment;
   final VoidCallback onOfferSent;
+  final bool hasSubmittedOffer;
 
-  const _ShipmentCard({required this.shipment, required this.onOfferSent});
+  const _ShipmentCard({
+    required this.shipment,
+    required this.onOfferSent,
+    required this.hasSubmittedOffer,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -222,23 +238,27 @@ class _ShipmentCard extends StatelessWidget {
               width: double.infinity,
               child: ElevatedButton(
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: AppTheme.primaryColor,
+                  backgroundColor:
+                      hasSubmittedOffer ? theme.colorScheme.outline : AppTheme.primaryColor,
                   foregroundColor: Colors.white,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(8),
                   ),
                 ),
-                onPressed: () async {
+                onPressed: hasSubmittedOffer
+                    ? null
+                    : () async {
                   await showModalBottomSheet<void>(
                     context: context,
                     isScrollControlled: true,
                     backgroundColor: Colors.transparent,
-                    builder: (_) =>
-                        CourierOfferSheet(shipment: shipment),
+                    builder: (_) => CourierOfferSheet(
+                      shipment: shipment,
+                      onSubmitted: onOfferSent,
+                    ),
                   );
-                  onOfferSent();
-                },
-                child: const Text('Submit Offer'),
+                  },
+                child: Text(hasSubmittedOffer ? 'Offer Submitted' : 'Submit Offer'),
               ),
             ),
           ],

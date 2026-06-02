@@ -5,9 +5,11 @@ import 'package:flutter/services.dart';
 import 'package:get_it/get_it.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:customer_nzubia_global/core/constants/api_constants.dart';
 import 'package:customer_nzubia_global/core/network/dio_client.dart';
 import 'package:customer_nzubia_global/core/theme/app_theme.dart';
+import 'package:customer_nzubia_global/features/auth/domain/repositories/auth_repository.dart';
 import 'package:customer_nzubia_global/features/p2p/domain/models/p2p_shipment_request.dart';
 import 'package:customer_nzubia_global/features/p2p/domain/repositories/p2p_shipment_repository.dart';
 
@@ -23,10 +25,14 @@ class CourierPickupScreen extends StatefulWidget {
 class _CourierPickupScreenState extends State<CourierPickupScreen> {
   static const int _codeLength = 6;
 
-  final List<TextEditingController> _digitCtrls =
-      List.generate(_codeLength, (_) => TextEditingController());
-  final List<FocusNode> _focusNodes =
-      List.generate(_codeLength, (_) => FocusNode());
+  final List<TextEditingController> _digitCtrls = List.generate(
+    _codeLength,
+    (_) => TextEditingController(),
+  );
+  final List<FocusNode> _focusNodes = List.generate(
+    _codeLength,
+    (_) => FocusNode(),
+  );
 
   final List<XFile> _photos = [];
   bool _uploading = false;
@@ -35,6 +41,8 @@ class _CourierPickupScreenState extends State<CourierPickupScreen> {
 
   P2pShipmentRequest? _shipment;
   bool _loadingShipment = true;
+  String? _seekerPhone;
+  String? _seekerName;
 
   final _picker = ImagePicker();
 
@@ -48,7 +56,21 @@ class _CourierPickupScreenState extends State<CourierPickupScreen> {
     try {
       final repo = GetIt.instance<P2pShipmentRepository>();
       final s = await repo.getRequest(widget.shipmentId);
-      if (mounted) setState(() { _shipment = s; _loadingShipment = false; });
+      if (mounted) {
+        final currentUser = GetIt.instance<AuthRepository>().currentUser;
+        final shipperPhone = s.seeker?.phone?.isNotEmpty == true
+            ? s.seeker!.phone
+            : currentUser?.phone;
+        final shipperName = (s.seeker?.fullName?.isNotEmpty == true)
+            ? s.seeker!.fullName
+            : currentUser?.fullName;
+        setState(() {
+          _shipment = s;
+          _seekerPhone = shipperPhone;
+          _seekerName = shipperName?.isNotEmpty == true ? shipperName : null;
+          _loadingShipment = false;
+        });
+      }
     } catch (_) {
       if (mounted) setState(() => _loadingShipment = false);
     }
@@ -65,8 +87,7 @@ class _CourierPickupScreenState extends State<CourierPickupScreen> {
     super.dispose();
   }
 
-  String get _code =>
-      _digitCtrls.map((c) => c.text).join();
+  String get _code => _digitCtrls.map((c) => c.text).join();
 
   bool get _codeComplete => _code.length == _codeLength;
 
@@ -109,9 +130,10 @@ class _CourierPickupScreenState extends State<CourierPickupScreen> {
         filename: file.path.split('/').last,
       ),
     });
-    final response = await GetIt.instance<DioClient>()
-        .dio
-        .post(ApiConstants.fileUpload, data: formData);
+    final response = await GetIt.instance<DioClient>().dio.post(
+      ApiConstants.fileUpload,
+      data: formData,
+    );
     return response.data['url'] as String?;
   }
 
@@ -158,7 +180,8 @@ class _CourierPickupScreenState extends State<CourierPickupScreen> {
       );
       if (!mounted) return;
       context.pushReplacement(
-          '/p2p/courier/shipment/${widget.shipmentId}/in-transit');
+        '/p2p/courier/shipment/${widget.shipmentId}/in-transit',
+      );
     } catch (e) {
       if (!mounted) return;
       final msg = e.toString();
@@ -198,14 +221,17 @@ class _CourierPickupScreenState extends State<CourierPickupScreen> {
                   color: theme.colorScheme.surface,
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
-                      color: theme.colorScheme.outline.withOpacity(0.4)),
+                    color: theme.colorScheme.outline.withOpacity(0.4),
+                  ),
                 ),
                 child: const Center(
                   child: SizedBox(
                     width: 20,
                     height: 20,
                     child: CircularProgressIndicator(
-                        color: AppTheme.primaryColor, strokeWidth: 2),
+                      color: AppTheme.primaryColor,
+                      strokeWidth: 2,
+                    ),
                   ),
                 ),
               )
@@ -216,14 +242,18 @@ class _CourierPickupScreenState extends State<CourierPickupScreen> {
                 decoration: BoxDecoration(
                   color: AppTheme.primaryColor.withAlpha(14),
                   borderRadius: BorderRadius.circular(12),
-                  border:
-                      Border.all(color: AppTheme.primaryColor.withAlpha(50)),
+                  border: Border.all(
+                    color: AppTheme.primaryColor.withAlpha(50),
+                  ),
                 ),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Icon(Icons.location_on,
-                        color: AppTheme.primaryColor, size: 22),
+                    const Icon(
+                      Icons.location_on,
+                      color: AppTheme.primaryColor,
+                      size: 22,
+                    ),
                     const SizedBox(width: 10),
                     Expanded(
                       child: Column(
@@ -244,12 +274,55 @@ class _CourierPickupScreenState extends State<CourierPickupScreen> {
                               fontWeight: FontWeight.w700,
                             ),
                           ),
+                          const SizedBox(height: 6),
+                          GestureDetector(
+                            onTap: _seekerPhone != null
+                                ? () => launchUrl(
+                                      Uri(scheme: 'tel', path: _seekerPhone),
+                                    )
+                                : null,
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.phone_outlined,
+                                  size: 14,
+                                  color: _seekerPhone != null
+                                      ? AppTheme.primaryColor
+                                      : theme.colorScheme.onSurface
+                                          .withOpacity(0.4),
+                                ),
+                                const SizedBox(width: 5),
+                                Expanded(
+                                  child: Text(
+                                    _seekerPhone != null
+                                        ? [
+                                            if (_seekerName != null)
+                                              _seekerName!,
+                                            _seekerPhone!,
+                                          ].join(' · ')
+                                        : 'Contact phone: Unavailable',
+                                    style: theme.textTheme.bodySmall?.copyWith(
+                                      color: _seekerPhone != null
+                                          ? AppTheme.primaryColor
+                                          : theme.colorScheme.onSurface
+                                              .withOpacity(0.5),
+                                      fontWeight: FontWeight.w600,
+                                      decoration: _seekerPhone != null
+                                          ? TextDecoration.underline
+                                          : null,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
                           const SizedBox(height: 4),
                           Text(
                             'Meet the seeker here to collect the package.',
                             style: theme.textTheme.bodySmall?.copyWith(
-                              color: theme.colorScheme.onSurface
-                                  .withOpacity(0.55),
+                              color: theme.colorScheme.onSurface.withOpacity(
+                                0.55,
+                              ),
                             ),
                           ),
                         ],
@@ -300,14 +373,19 @@ class _CourierPickupScreenState extends State<CourierPickupScreen> {
                 ),
                 child: Row(
                   children: [
-                    Icon(Icons.error_outline,
-                        color: theme.colorScheme.error, size: 18),
+                    Icon(
+                      Icons.error_outline,
+                      color: theme.colorScheme.error,
+                      size: 18,
+                    ),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
                         _error!,
                         style: TextStyle(
-                            color: theme.colorScheme.error, fontSize: 13),
+                          color: theme.colorScheme.error,
+                          fontSize: 13,
+                        ),
                       ),
                     ),
                   ],
@@ -335,12 +413,16 @@ class _CourierPickupScreenState extends State<CourierPickupScreen> {
                             height: 18,
                             width: 18,
                             child: CircularProgressIndicator(
-                                color: Colors.white, strokeWidth: 2),
+                              color: Colors.white,
+                              strokeWidth: 2,
+                            ),
                           ),
                           const SizedBox(width: 12),
-                          Text(_uploading
-                              ? 'Uploading photos…'
-                              : 'Confirming pickup…'),
+                          Text(
+                            _uploading
+                                ? 'Uploading photos…'
+                                : 'Confirming pickup…',
+                          ),
                         ],
                       )
                     : const Text('Confirm Pickup'),
@@ -393,10 +475,7 @@ class _OtpRow extends StatelessWidget {
               FilteringTextInputFormatter.digitsOnly,
               LengthLimitingTextInputFormatter(1),
             ],
-            style: const TextStyle(
-              fontSize: 22,
-              fontWeight: FontWeight.bold,
-            ),
+            style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
             decoration: InputDecoration(
               counterText: '',
               contentPadding: const EdgeInsets.symmetric(vertical: 12),
@@ -417,8 +496,11 @@ class _PhotoGrid extends StatelessWidget {
   final VoidCallback? onAdd;
   final void Function(int)? onRemove;
 
-  const _PhotoGrid(
-      {required this.photos, required this.onAdd, required this.onRemove});
+  const _PhotoGrid({
+    required this.photos,
+    required this.onAdd,
+    required this.onRemove,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -457,8 +539,11 @@ class _PhotoGrid extends StatelessWidget {
                         color: Colors.red,
                         shape: BoxShape.circle,
                       ),
-                      child: const Icon(Icons.close,
-                          color: Colors.white, size: 16),
+                      child: const Icon(
+                        Icons.close,
+                        color: Colors.white,
+                        size: 16,
+                      ),
                     ),
                   ),
                 ),
@@ -481,13 +566,18 @@ class _PhotoGrid extends StatelessWidget {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.add_a_photo_outlined,
-                      color: theme.colorScheme.outline),
+                  Icon(
+                    Icons.add_a_photo_outlined,
+                    color: theme.colorScheme.outline,
+                  ),
                   const SizedBox(height: 4),
-                  Text('Add photo',
-                      style: TextStyle(
-                          fontSize: 11,
-                          color: theme.colorScheme.outline)),
+                  Text(
+                    'Add photo',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: theme.colorScheme.outline,
+                    ),
+                  ),
                 ],
               ),
             ),

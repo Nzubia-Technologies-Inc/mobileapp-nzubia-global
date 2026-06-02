@@ -6,19 +6,21 @@ class P2pUserSummary extends Equatable {
   final String id;
   final String? email;
   final String? fullName;
+  final String? phone;
 
-  const P2pUserSummary({required this.id, this.email, this.fullName});
+  const P2pUserSummary({required this.id, this.email, this.fullName, this.phone});
 
   factory P2pUserSummary.fromJson(Map<String, dynamic> json) {
     return P2pUserSummary(
       id: json['id'] as String,
       email: json['email'] as String?,
       fullName: json['full_name'] as String?,
+      phone: json['phone'] as String?,
     );
   }
 
   @override
-  List<Object?> get props => [id, email, fullName];
+  List<Object?> get props => [id, email, fullName, phone];
 }
 
 class P2pCourierProfile extends Equatable {

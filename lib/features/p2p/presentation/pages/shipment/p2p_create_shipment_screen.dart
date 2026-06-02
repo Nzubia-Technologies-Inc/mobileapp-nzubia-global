@@ -45,12 +45,22 @@ class _CreateShipmentViewState extends State<_CreateShipmentView> {
   late TextEditingController _deliveryController;
   String _deliveryCity = '';
   String _deliveryCountry = '';
+  double? _pickupLat;
+  double? _pickupLng;
 
   @override
   void initState() {
     super.initState();
     _pickupController = TextEditingController();
     _deliveryController = TextEditingController();
+    _pickupController.addListener(() {
+      if (_pickupLat != null || _pickupLng != null) {
+        setState(() {
+          _pickupLat = null;
+          _pickupLng = null;
+        });
+      }
+    });
   }
 
   @override
@@ -63,7 +73,8 @@ class _CreateShipmentViewState extends State<_CreateShipmentView> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final showWarning = _selectedCategory != null &&
+    final showWarning =
+        _selectedCategory != null &&
         _restrictedCategories.contains(_selectedCategory);
 
     return BlocListener<P2pShipmentBloc, P2pShipmentState>(
@@ -117,8 +128,11 @@ class _CreateShipmentViewState extends State<_CreateShipmentView> {
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Icon(Icons.warning_amber_outlined,
-                            color: Colors.amber[800], size: 20),
+                        Icon(
+                          Icons.warning_amber_outlined,
+                          color: Colors.amber[800],
+                          size: 20,
+                        ),
                         const SizedBox(width: 10),
                         Expanded(
                           child: Column(
@@ -137,8 +151,9 @@ class _CreateShipmentViewState extends State<_CreateShipmentView> {
                                 'or may be refused by some couriers. '
                                 'Please check compliance guidelines before proceeding.',
                                 style: theme.textTheme.bodySmall?.copyWith(
-                                    color: theme.colorScheme.onSurface
-                                        .withOpacity(0.8)),
+                                  color: theme.colorScheme.onSurface
+                                      .withOpacity(0.8),
+                                ),
                               ),
                               const SizedBox(height: 6),
                               GestureDetector(
@@ -199,8 +214,9 @@ class _CreateShipmentViewState extends State<_CreateShipmentView> {
                         fontSize: 13,
                       ),
                       checkmarkColor: Colors.white,
-                      backgroundColor:
-                          theme.colorScheme.outline.withOpacity(0.12),
+                      backgroundColor: theme.colorScheme.outline.withOpacity(
+                        0.12,
+                      ),
                       side: BorderSide.none,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(20),
@@ -225,7 +241,8 @@ class _CreateShipmentViewState extends State<_CreateShipmentView> {
                           prefixIcon: Icon(Icons.scale_outlined),
                         ),
                         keyboardType: const TextInputType.numberWithOptions(
-                            decimal: true),
+                          decimal: true,
+                        ),
                         validator: _positiveNumber,
                       ),
                     ),
@@ -239,7 +256,8 @@ class _CreateShipmentViewState extends State<_CreateShipmentView> {
                           prefixIcon: Icon(Icons.attach_money_outlined),
                         ),
                         keyboardType: const TextInputType.numberWithOptions(
-                            decimal: true),
+                          decimal: true,
+                        ),
                         validator: _positiveNumber,
                       ),
                     ),
@@ -252,9 +270,12 @@ class _CreateShipmentViewState extends State<_CreateShipmentView> {
                       child: FormBuilderTextField(
                         name: 'length_cm',
                         decoration: const InputDecoration(
-                            labelText: 'L (cm)', suffixText: 'cm'),
+                          labelText: 'L (cm)',
+                          suffixText: 'cm',
+                        ),
                         keyboardType: const TextInputType.numberWithOptions(
-                            decimal: true),
+                          decimal: true,
+                        ),
                       ),
                     ),
                     const SizedBox(width: 6),
@@ -262,9 +283,12 @@ class _CreateShipmentViewState extends State<_CreateShipmentView> {
                       child: FormBuilderTextField(
                         name: 'width_cm',
                         decoration: const InputDecoration(
-                            labelText: 'W (cm)', suffixText: 'cm'),
+                          labelText: 'W (cm)',
+                          suffixText: 'cm',
+                        ),
                         keyboardType: const TextInputType.numberWithOptions(
-                            decimal: true),
+                          decimal: true,
+                        ),
                       ),
                     ),
                     const SizedBox(width: 6),
@@ -272,9 +296,12 @@ class _CreateShipmentViewState extends State<_CreateShipmentView> {
                       child: FormBuilderTextField(
                         name: 'height_cm',
                         decoration: const InputDecoration(
-                            labelText: 'H (cm)', suffixText: 'cm'),
+                          labelText: 'H (cm)',
+                          suffixText: 'cm',
+                        ),
                         keyboardType: const TextInputType.numberWithOptions(
-                            decimal: true),
+                          decimal: true,
+                        ),
                       ),
                     ),
                   ],
@@ -295,12 +322,18 @@ class _CreateShipmentViewState extends State<_CreateShipmentView> {
                   boxDecoration: const BoxDecoration(),
                   debounceTime: 400,
                   countries: const [],
-                  isLatLngRequired: false,
-                  getPlaceDetailWithLatLng: (_) {},
+                  isLatLngRequired: true,
+                  getPlaceDetailWithLatLng: (Prediction prediction) {
+                    setState(() {
+                      _pickupLat = double.tryParse(prediction.lat ?? '');
+                      _pickupLng = double.tryParse(prediction.lng ?? '');
+                    });
+                  },
                   itemClick: (Prediction prediction) {
                     _pickupController.text = prediction.description ?? '';
                     _pickupController.selection = TextSelection.fromPosition(
-                        TextPosition(offset: _pickupController.text.length));
+                      TextPosition(offset: _pickupController.text.length),
+                    );
                     FocusScope.of(context).unfocus();
                   },
                   seperatedBuilder: const Divider(height: 1),
@@ -309,15 +342,24 @@ class _CreateShipmentViewState extends State<_CreateShipmentView> {
                     return ListTile(
                       leading: const CircleAvatar(
                         backgroundColor: Colors.grey,
-                        child: Icon(Icons.location_on, color: Colors.white, size: 20),
+                        child: Icon(
+                          Icons.location_on,
+                          color: Colors.white,
+                          size: 20,
+                        ),
                       ),
                       title: Text(
-                        prediction.structuredFormatting?.mainText ?? prediction.description ?? '',
+                        prediction.structuredFormatting?.mainText ??
+                            prediction.description ??
+                            '',
                         style: const TextStyle(fontWeight: FontWeight.w500),
                       ),
                       subtitle: Text(
                         prediction.structuredFormatting?.secondaryText ?? '',
-                        style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
+                        style: TextStyle(
+                          color: Colors.grey.shade600,
+                          fontSize: 12,
+                        ),
                       ),
                       dense: true,
                     );
@@ -343,11 +385,16 @@ class _CreateShipmentViewState extends State<_CreateShipmentView> {
                   itemClick: (Prediction prediction) {
                     _deliveryController.text = prediction.description ?? '';
                     _deliveryController.selection = TextSelection.fromPosition(
-                        TextPosition(offset: _deliveryController.text.length));
+                      TextPosition(offset: _deliveryController.text.length),
+                    );
                     final terms = prediction.terms ?? [];
                     setState(() {
-                      _deliveryCity = terms.isNotEmpty ? (terms.first.value ?? '') : '';
-                      _deliveryCountry = terms.length > 1 ? (terms.last.value ?? '') : '';
+                      _deliveryCity = terms.isNotEmpty
+                          ? (terms.first.value ?? '')
+                          : '';
+                      _deliveryCountry = terms.length > 1
+                          ? (terms.last.value ?? '')
+                          : '';
                     });
                     FocusScope.of(context).unfocus();
                   },
@@ -357,15 +404,24 @@ class _CreateShipmentViewState extends State<_CreateShipmentView> {
                     return ListTile(
                       leading: const CircleAvatar(
                         backgroundColor: Colors.grey,
-                        child: Icon(Icons.location_on, color: Colors.white, size: 20),
+                        child: Icon(
+                          Icons.location_on,
+                          color: Colors.white,
+                          size: 20,
+                        ),
                       ),
                       title: Text(
-                        prediction.structuredFormatting?.mainText ?? prediction.description ?? '',
+                        prediction.structuredFormatting?.mainText ??
+                            prediction.description ??
+                            '',
                         style: const TextStyle(fontWeight: FontWeight.w500),
                       ),
                       subtitle: Text(
                         prediction.structuredFormatting?.secondaryText ?? '',
-                        style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
+                        style: TextStyle(
+                          color: Colors.grey.shade600,
+                          fontSize: 12,
+                        ),
                       ),
                       dense: true,
                     );
@@ -383,8 +439,7 @@ class _CreateShipmentViewState extends State<_CreateShipmentView> {
                     prefixIcon: Icon(Icons.event_outlined),
                   ),
                   firstDate: DateTime.now().add(const Duration(days: 1)),
-                  lastDate:
-                      DateTime.now().add(const Duration(days: 365)),
+                  lastDate: DateTime.now().add(const Duration(days: 365)),
                   validator: (v) => v == null ? 'Required' : null,
                 ),
 
@@ -402,8 +457,7 @@ class _CreateShipmentViewState extends State<_CreateShipmentView> {
                 const SizedBox(height: 32),
                 BlocBuilder<P2pShipmentBloc, P2pShipmentState>(
                   builder: (context, state) {
-                    final isLoading =
-                        state.status == P2pShipmentStatus.loading;
+                    final isLoading = state.status == P2pShipmentStatus.loading;
                     return SizedBox(
                       width: double.infinity,
                       height: 52,
@@ -428,8 +482,9 @@ class _CreateShipmentViewState extends State<_CreateShipmentView> {
                             : const Text(
                                 'Submit Request',
                                 style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w600),
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                ),
                               ),
                       ),
                     );
@@ -458,9 +513,9 @@ class _CreateShipmentViewState extends State<_CreateShipmentView> {
 
   Future<void> _pickPhoto() async {
     if (_photoPaths.length >= 4) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Maximum 4 photos allowed')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Maximum 4 photos allowed')));
       return;
     }
     final picked = await _picker.pickImage(
@@ -475,9 +530,9 @@ class _CreateShipmentViewState extends State<_CreateShipmentView> {
 
   void _onSubmit() {
     if (_selectedCategory == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select a category')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Please select a category')));
       return;
     }
     if (_pickupController.text.trim().isEmpty) {
@@ -498,36 +553,43 @@ class _CreateShipmentViewState extends State<_CreateShipmentView> {
     final length = double.tryParse(v['length_cm']?.toString() ?? '');
     final width = double.tryParse(v['width_cm']?.toString() ?? '');
     final height = double.tryParse(v['height_cm']?.toString() ?? '');
-    final hasDims = length != null && width != null && height != null &&
-        length > 0 && width > 0 && height > 0;
+    final hasDims =
+        length != null &&
+        width != null &&
+        height != null &&
+        length > 0 &&
+        width > 0 &&
+        height > 0;
 
     final deliveryText = _deliveryController.text.trim();
     final deliveryCity = _deliveryCity.isNotEmpty
         ? _deliveryCity
-        : (deliveryText.contains(',') ? deliveryText.split(',').first.trim() : deliveryText);
+        : (deliveryText.contains(',')
+              ? deliveryText.split(',').first.trim()
+              : deliveryText);
     final deliveryCountry = _deliveryCountry.isNotEmpty
         ? _deliveryCountry
-        : (deliveryText.contains(',') ? deliveryText.split(',').last.trim() : '');
+        : (deliveryText.contains(',')
+              ? deliveryText.split(',').last.trim()
+              : '');
 
     context.read<P2pShipmentBloc>().add(
-          P2pShipmentCreateRequested({
-            'itemDescription': v['item_description'],
-            'itemCategory': _selectedCategory!.toJson(),
-            'weightKg': double.tryParse(v['weight_kg']?.toString() ?? '') ?? 0,
-            'declaredValueUsd':
-                double.tryParse(v['declared_value_usd']?.toString() ?? '') ?? 0,
-            'originAddress': _pickupController.text,
-            'destinationCountry': deliveryCountry,
-            'destinationCity': deliveryCity,
-            if (hasDims)
-              'dimensionsCm': {
-                'length': length,
-                'width': width,
-                'height': height,
-              },
-            if (_photoPaths.isNotEmpty) 'photoUrls': _photoPaths,
-          }),
-        );
+      P2pShipmentCreateRequested({
+        'itemDescription': v['item_description'],
+        'itemCategory': _selectedCategory!.toJson(),
+        'weightKg': double.tryParse(v['weight_kg']?.toString() ?? '') ?? 0,
+        'declaredValueUsd':
+            double.tryParse(v['declared_value_usd']?.toString() ?? '') ?? 0,
+        'originAddress': _pickupController.text,
+        if (_pickupLat != null) 'originLatitude': _pickupLat,
+        if (_pickupLng != null) 'originLongitude': _pickupLng,
+        'destinationCountry': deliveryCountry,
+        'destinationCity': deliveryCity,
+        if (hasDims)
+          'dimensionsCm': {'length': length, 'width': width, 'height': height},
+        if (_photoPaths.isNotEmpty) 'photoUrls': _photoPaths,
+      }),
+    );
   }
 }
 
@@ -569,10 +631,7 @@ class _PhotoGrid extends StatelessWidget {
       children: [
         ...List.generate(
           paths.length,
-          (i) => _PhotoTile(
-            path: paths[i],
-            onRemove: () => onRemove(i),
-          ),
+          (i) => _PhotoTile(path: paths[i], onRemove: () => onRemove(i)),
         ),
         if (paths.length < 4)
           GestureDetector(
@@ -584,21 +643,26 @@ class _PhotoGrid extends StatelessWidget {
                 color: theme.colorScheme.outline.withOpacity(0.12),
                 borderRadius: BorderRadius.circular(10),
                 border: Border.all(
-                    color: theme.colorScheme.outline,
-                    style: BorderStyle.solid),
+                  color: theme.colorScheme.outline,
+                  style: BorderStyle.solid,
+                ),
               ),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.add_photo_alternate_outlined,
-                      color: theme.colorScheme.onSurface.withOpacity(0.4),
-                      size: 28),
+                  Icon(
+                    Icons.add_photo_alternate_outlined,
+                    color: theme.colorScheme.onSurface.withOpacity(0.4),
+                    size: 28,
+                  ),
                   const SizedBox(height: 2),
-                  Text('Add',
-                      style: TextStyle(
-                          color:
-                              theme.colorScheme.onSurface.withOpacity(0.45),
-                          fontSize: 11)),
+                  Text(
+                    'Add',
+                    style: TextStyle(
+                      color: theme.colorScheme.onSurface.withOpacity(0.45),
+                      fontSize: 11,
+                    ),
+                  ),
                 ],
               ),
             ),

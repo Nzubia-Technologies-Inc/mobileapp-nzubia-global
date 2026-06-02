@@ -7,6 +7,7 @@ abstract class MessagingRemoteDatasource {
   Future<List<ChatEntity>> getChats();
   Stream<MessageEntity> get messageStream;
   Future<void> initialize();
+  Future<void> joinRoom(String roomId);
   void dispose();
   Future<dynamic> getSupportAdmin();
 

@@ -5,7 +5,6 @@ import 'package:go_router/go_router.dart';
 import 'package:customer_nzubia_global/core/theme/app_theme.dart';
 import 'package:customer_nzubia_global/core/utils/service_locator.dart';
 import 'package:customer_nzubia_global/core/theme/custom_theme_extension.dart';
-import 'package:customer_nzubia_global/core/widgets/glass_container.dart';
 import 'package:customer_nzubia_global/core/widgets/animated_scale_button.dart';
 import 'package:customer_nzubia_global/features/shipment/domain/entities/shipment_entity.dart';
 import 'package:customer_nzubia_global/features/shipment/presentation/bloc/shipment_list/shipment_list_bloc.dart';
@@ -20,17 +19,27 @@ import 'package:customer_nzubia_global/l10n/app_localizations.dart';
 import 'package:customer_nzubia_global/core/widgets/offline_error_widget.dart';
 import 'package:customer_nzubia_global/core/network/socket_client.dart';
 import 'package:customer_nzubia_global/features/p2p/domain/repositories/p2p_courier_repository.dart';
+import 'package:customer_nzubia_global/features/p2p/domain/enums/p2p_enums.dart';
+import 'package:customer_nzubia_global/features/p2p/presentation/bloc/shipment/p2p_shipment_bloc.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return BlocProvider(
-      create: (context) => ShipmentListBloc(
-        shipmentRepository: sl(),
-        socketClient: sl<SocketClient>(),
-      )..add(const LoadShipments()),
+    return MultiBlocProvider(
+      providers: [
+        BlocProvider(
+          create: (context) => ShipmentListBloc(
+            shipmentRepository: sl(),
+            socketClient: sl<SocketClient>(),
+          )..add(const LoadShipments()),
+        ),
+        BlocProvider(
+          create: (context) => P2pShipmentBloc(repository: sl())
+            ..add(const P2pShipmentListRequested()),
+        ),
+      ],
       child: const _HomeView(),
     );
   }
@@ -41,47 +50,32 @@ class _HomeView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    // Use AuthBloc to get the user responsively (handling reloads/async init)
     return BlocBuilder<AuthBloc, AuthState>(
       builder: (context, authState) {
         if (authState.status == AuthStatus.unauthenticated) {
-          // Should ideally redirect, but for now show empty or login prompt
-          return const Scaffold(body: Center(child: Text("Please log in")));
+          return const Scaffold(body: Center(child: Text('Please log in')));
         }
         if (authState.user == null) {
-          return const Scaffold(
-            body: Center(child: CircularProgressIndicator()),
-          );
+          return const Scaffold(body: Center(child: CircularProgressIndicator()));
         }
 
-        final user = authState.user;
-        final firstName = user?.firstName ?? 'User';
+        final user = authState.user!;
+        final firstName = user.firstName ?? 'User';
+        final initials = _initials(user.firstName, user.lastName);
 
         return DefaultTabController(
           length: 2,
           child: Scaffold(
-            backgroundColor: theme.scaffoldBackgroundColor,
+            backgroundColor: Theme.of(context).scaffoldBackgroundColor,
             body: NestedScrollView(
               headerSliverBuilder: (context, innerBoxIsScrolled) {
                 return [
-                  _buildHeader(context, firstName),
+                  _buildHeader(context, firstName, initials),
                   SliverPersistentHeader(
                     pinned: true,
                     delegate: _SliverTabBarDelegate(
-                      TabBar(
-                        indicatorColor: theme.colorScheme.primary,
-                        labelColor: theme.colorScheme.onSurface,
-                        unselectedLabelColor: theme.colorScheme.onSurface
-                            .withOpacity(0.6),
-                        dividerColor: Colors.transparent,
-                        tabs: const [
-                          Tab(text: 'Sent'),
-                          Tab(text: 'Received'),
-                        ],
-                      ),
-                      color: theme.colorScheme.surface,
+                      _buildTabBar(context),
+                      color: Theme.of(context).colorScheme.surface,
                     ),
                   ),
                 ];
@@ -89,35 +83,32 @@ class _HomeView extends StatelessWidget {
               body: TabBarView(
                 children: [
                   _ShipmentList(
-                    filter: (s) => s.customerId == user?.id,
-                  ), // Sent
+                    filter: (s) => s.customerId == user.id,
+                    emptyTitle: 'No sent shipments',
+                    emptySubtitle: 'Tap "Ship Now" to create your first shipment.',
+                    emptyIcon: Icons.send_rounded,
+                  ),
                   _ShipmentList(
                     filter: (s) =>
-                        s.recipient?.email.toLowerCase() ==
-                        user?.email.toLowerCase(),
-                  ), // Received
+                        s.recipient?.email.toLowerCase() == user.email.toLowerCase(),
+                    emptyTitle: 'No received shipments',
+                    emptySubtitle: 'Packages addressed to you will appear here.',
+                    emptyIcon: Icons.move_to_inbox_rounded,
+                  ),
                 ],
               ),
             ),
             floatingActionButton: AnimatedScaleButton(
-              onPressed: () async {
-                await context.push('/create-shipment');
-                if (context.mounted) {
-                  context.read<ShipmentListBloc>().add(const LoadShipments());
-                }
-              },
+              onPressed: () => _showShipmentTypeModal(context),
               child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 24,
-                  vertical: 16,
-                ),
+                padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 14),
                 decoration: BoxDecoration(
-                  color: theme.colorScheme.primary,
+                  color: Theme.of(context).colorScheme.primary,
                   borderRadius: BorderRadius.circular(30),
                   boxShadow: [
                     BoxShadow(
-                      color: theme.colorScheme.primary.withOpacity(0.4),
-                      blurRadius: 16,
+                      color: Theme.of(context).colorScheme.primary.withOpacity(0.38),
+                      blurRadius: 18,
                       offset: const Offset(0, 8),
                     ),
                   ],
@@ -125,13 +116,13 @@ class _HomeView extends StatelessWidget {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.add, color: theme.colorScheme.onPrimary),
+                    Icon(Icons.add_rounded, color: Theme.of(context).colorScheme.onPrimary),
                     const SizedBox(width: 8),
                     Text(
                       'Ship Now',
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        color: theme.colorScheme.onPrimary,
-                        fontWeight: FontWeight.bold,
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        color: Theme.of(context).colorScheme.onPrimary,
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
                   ],
@@ -144,274 +135,284 @@ class _HomeView extends StatelessWidget {
     );
   }
 
-  // Re-implementing _buildHeader here to reference it correctly in NestedScrollView
-  Widget _buildHeader(BuildContext context, String firstName) {
+  String _initials(String? firstName, String? lastName) {
+    final a = firstName?.isNotEmpty == true ? firstName![0].toUpperCase() : '';
+    final b = lastName?.isNotEmpty == true ? lastName![0].toUpperCase() : '';
+    if (a.isEmpty && b.isEmpty) return '?';
+    return '$a$b';
+  }
+
+  TabBar _buildTabBar(BuildContext context) {
     final theme = Theme.of(context);
+    final primaryColor = theme.colorScheme.primary;
+    final subtitleColor = theme.colorScheme.onSurface.withOpacity(0.55);
+
+    return TabBar(
+      indicatorSize: TabBarIndicatorSize.tab,
+      indicator: BoxDecoration(
+        color: primaryColor.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      indicatorColor: Colors.transparent,
+      labelColor: primaryColor,
+      unselectedLabelColor: subtitleColor,
+      labelStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+      unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w500, fontSize: 13),
+      dividerColor: Colors.transparent,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      tabs: const [Tab(text: 'Sent'), Tab(text: 'Received')],
+    );
+  }
+
+  Widget _buildHeader(BuildContext context, String firstName, String initials) {
+    final theme = Theme.of(context);
+    final primaryColor = theme.colorScheme.primary;
+    final subtitleColor = theme.colorScheme.onSurface.withOpacity(0.55);
 
     return BlocBuilder<ShipmentListBloc, ShipmentListState>(
       builder: (context, state) {
-        int activeCount = 0;
-        int completedCount = 0;
+        return BlocBuilder<P2pShipmentBloc, P2pShipmentState>(
+          builder: (context, p2pState) {
+            final p2pActiveCount = p2pState.requests
+                .where((r) => const {
+                      ShipmentRequestStatus.inTransit,
+                      ShipmentRequestStatus.handoffPending,
+                    }.contains(r.status))
+                .length;
+            final p2pDeliveredCount = p2pState.requests
+                .where((r) => const {
+                      ShipmentRequestStatus.delivered,
+                      ShipmentRequestStatus.completed,
+                    }.contains(r.status))
+                .length;
 
-        if (state.shipments.isNotEmpty) {
-          activeCount = state.shipments
-              .where(
-                (s) => [
-                  'IN_TRANSIT',
-                  'BOOKED',
-                  'PENDING_AGENTS',
-                ].contains(s.status),
-              )
-              .length;
-          completedCount = state.shipments
-              .where((s) => s.status == 'DELIVERED')
-              .length;
-        }
+            final activeCount = state.shipments
+                    .where((s) =>
+                        ['IN_TRANSIT', 'BOOKED', 'PENDING_AGENTS'].contains(s.status))
+                    .length +
+                p2pActiveCount;
+            final deliveredCount =
+                state.shipments.where((s) => s.status == 'DELIVERED').length +
+                    p2pDeliveredCount;
+            final isLoading =
+                state.status == ShipmentListStatus.loading && state.shipments.isEmpty;
 
         return SliverToBoxAdapter(
-          child: Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  theme.scaffoldBackgroundColor,
-                  theme.scaffoldBackgroundColor.withOpacity(0.95),
-                ],
-              ),
-            ),
-            padding: const EdgeInsets.fromLTRB(20, 60, 20, 24),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 60, 20, 20),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // Top bar: avatar + greeting + refresh
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
-                      'Hey, $firstName! 👋',
-                      style: theme.textTheme.headlineMedium?.copyWith(
-                        color: theme.colorScheme.onSurface,
-                        fontWeight: FontWeight.bold,
+                    Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [primaryColor, primaryColor.withOpacity(0.65)],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Center(
+                        child: Text(
+                          initials,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 16,
+                          ),
+                        ),
                       ),
                     ),
-                    BlocBuilder<ShipmentListBloc, ShipmentListState>(
-                      builder: (context, state) {
-                        return IconButton(
-                          icon: state.status == ShipmentListStatus.loading
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Hey, $firstName! 👋',
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.w700,
+                              color: theme.colorScheme.onSurface,
+                            ),
+                          ),
+                          Text(
+                            'Track and manage your shipments',
+                            style: TextStyle(color: subtitleColor, fontSize: 12),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Material(
+                      color: theme.colorScheme.surface,
+                      borderRadius: BorderRadius.circular(12),
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(12),
+                        onTap: state.status == ShipmentListStatus.loading
+                            ? null
+                            : () {
+                                context
+                                    .read<ShipmentListBloc>()
+                                    .add(const LoadShipments());
+                                context
+                                    .read<P2pShipmentBloc>()
+                                    .add(const P2pShipmentListRequested());
+                              },
+                        child: Padding(
+                          padding: const EdgeInsets.all(10),
+                          child: state.status == ShipmentListStatus.loading
                               ? SizedBox(
                                   width: 20,
                                   height: 20,
                                   child: CircularProgressIndicator(
                                     strokeWidth: 2,
-                                    color: theme.colorScheme.primary,
+                                    color: primaryColor,
                                   ),
                                 )
-                              : Icon(
-                                  Icons.refresh,
-                                  color: theme.colorScheme.primary,
-                                ),
-                          tooltip: 'Refresh',
-                          onPressed: state.status == ShipmentListStatus.loading
-                              ? null
-                              : () => context.read<ShipmentListBloc>().add(
-                                  const LoadShipments(),
-                                ),
-                        );
-                      },
+                              : Icon(Icons.refresh_rounded,
+                                  color: subtitleColor, size: 22),
+                        ),
+                      ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 8),
-                Text(
-                  'Track and manage your shipments',
-                  style: theme.textTheme.bodyLarge?.copyWith(
-                    color: theme.colorScheme.onSurface.withOpacity(0.7),
-                  ),
-                ),
+
                 const SizedBox(height: 20),
 
-                // Tracking Search Bar
+                // Tracking search bar
                 const TrackingSearchBar(),
 
-                const SizedBox(height: 24),
+                const SizedBox(height: 20),
 
+                // Stat pills
                 Row(
                   children: [
-                    Expanded(
-                      child: _StatCard(
-                        icon: Icons.local_shipping,
-                        iconColor: theme.colorScheme.secondary,
-                        count: activeCount,
-                        label: 'Active',
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: _StatCard(
-                        icon: Icons.check_circle,
-                        iconColor: theme.colorScheme.secondary,
-                        count: completedCount,
-                        label: 'Completed',
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-
-                // P2P entry cards
-                Row(
-                  children: [
-                    Expanded(
-                      child: _P2pSendCard(
-                        onTap: () => context.push('/p2p/my-shipments'),
-                      ),
+                    _StatPill(
+                      icon: Icons.local_shipping_rounded,
+                      count: isLoading ? null : activeCount,
+                      label: 'Active',
+                      color: primaryColor,
                     ),
                     const SizedBox(width: 10),
-                    const Expanded(child: _CourierModeCard()),
+                    _StatPill(
+                      icon: Icons.check_circle_rounded,
+                      count: isLoading ? null : deliveredCount,
+                      label: 'Delivered',
+                      color: theme.extension<AppColorsExtension>()?.success ??
+                          Colors.green,
+                    ),
                   ],
                 ),
+
+                const SizedBox(height: 20),
+
+                // Quick actions label
+                Text(
+                  'Quick Actions',
+                  style: theme.textTheme.labelLarge?.copyWith(
+                    color: subtitleColor,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 12,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+                const SizedBox(height: 10),
+
+                // P2P action cards side-by-side
+                IntrinsicHeight(
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Expanded(
+                        child: _QuickActionCard(
+                          icon: Icons.send_rounded,
+                          color: Colors.teal,
+                          title: 'Send via P2P',
+                          subtitle: 'Ship with a traveler',
+                          onTap: () => context.push('/p2p/my-shipments'),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(child: _CourierModeCard()),
+                    ],
+                  ),
+                ),
+
                 const SizedBox(height: 8),
               ],
             ),
           ),
         );
+          },
+        );
       },
     );
   }
-}
 
-class _StatCard extends StatelessWidget {
-  final IconData icon;
-  final Color? iconColor;
-  final int count;
-  final String label;
-
-  const _StatCard({
-    required this.icon,
-    required this.iconColor,
-    required this.count,
-    required this.label,
-  });
-
-  @override
-  Widget build(BuildContext context) {
+  void _showShipmentTypeModal(BuildContext context) {
     final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
+    final bloc = context.read<ShipmentListBloc>();
 
-    final content = Padding(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(icon, color: iconColor, size: 20),
-              const SizedBox(width: 8),
-              Text(
-                '$count',
-                style: theme.textTheme.headlineSmall?.copyWith(
-                  color: theme.colorScheme.onSurface,
-                  fontWeight: FontWeight.bold,
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (_) => Container(
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surface,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        padding: const EdgeInsets.fromLTRB(24, 16, 24, 40),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.onSurface.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(2),
                 ),
               ),
-            ],
-          ),
-          const SizedBox(height: 4),
-          Text(
-            label,
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: theme.colorScheme.onSurface.withOpacity(0.6),
             ),
-          ),
-        ],
-      ),
-    );
-
-    if (isDark) {
-      return GlassContainer(child: content);
-    }
-
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-        border: Border.all(color: Colors.black.withOpacity(0.05)),
-      ),
-      child: content,
-    );
-  }
-}
-
-class _DashboardActionCard extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final VoidCallback onPressed;
-
-  const _DashboardActionCard({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    required this.onPressed,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colors = theme.extension<AppColorsExtension>();
-
-    return AnimatedScaleButton(
-      onPressed: onPressed,
-      child: GlassContainer(
-        padding: const EdgeInsets.all(18),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: (colors?.success ?? theme.colorScheme.primary)
-                    .withOpacity(0.14),
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Icon(
-                icon,
-                color: colors?.success ?? theme.colorScheme.primary,
-              ),
+            const SizedBox(height: 20),
+            Text(
+              'How would you like to ship?',
+              style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
             ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      color: theme.colorScheme.onSurface,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    subtitle,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurface.withOpacity(0.68),
-                    ),
-                  ),
-                ],
-              ),
+            const SizedBox(height: 6),
+            Text(
+              'Choose the shipping method that works best for you.',
+              style: theme.textTheme.bodyMedium
+                  ?.copyWith(color: theme.colorScheme.onSurface.withOpacity(0.6)),
             ),
-            const SizedBox(width: 12),
-            Icon(
-              Icons.arrow_forward_ios_rounded,
-              size: 16,
-              color: theme.colorScheme.onSurface.withOpacity(0.45),
+            const SizedBox(height: 24),
+            _ShipOptionTile(
+              icon: Icons.send_rounded,
+              color: Colors.teal,
+              title: 'Send via P2P',
+              subtitle: 'Ship with a traveler going your way',
+              onTap: () {
+                Navigator.of(context).pop();
+                context.push('/p2p/shipment/create');
+              },
+            ),
+            const SizedBox(height: 12),
+            _ShipOptionTile(
+              icon: Icons.local_shipping_rounded,
+              color: theme.colorScheme.primary,
+              title: 'Logistics Agent',
+              subtitle: 'Book a professional freight agent',
+              onTap: () async {
+                Navigator.of(context).pop();
+                await context.push('/create-shipment');
+                if (context.mounted) bloc.add(const LoadShipments());
+              },
             ),
           ],
         ),
@@ -420,96 +421,317 @@ class _DashboardActionCard extends StatelessWidget {
   }
 }
 
-class _ShipmentList extends StatelessWidget {
-  final bool Function(ShipmentEntity) filter;
+// ── Compact stat pill ─────────────────────────────────────────────────────────
 
-  const _ShipmentList({required this.filter});
+class _StatPill extends StatelessWidget {
+  final IconData icon;
+  final int? count;
+  final String label;
+  final Color color;
+
+  const _StatPill({
+    required this.icon,
+    required this.count,
+    required this.label,
+    required this.color,
+  });
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.08),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: color.withOpacity(0.2)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.15),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(icon, color: color, size: 16),
+            ),
+            const SizedBox(width: 10),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  count == null ? '—' : '$count',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    color: theme.colorScheme.onSurface,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 18,
+                  ),
+                ),
+                Text(
+                  label,
+                  style: TextStyle(
+                    color: theme.colorScheme.onSurface.withOpacity(0.55),
+                    fontSize: 11,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Quick action card (P2P Send) ──────────────────────────────────────────────
+
+class _QuickActionCard extends StatelessWidget {
+  final IconData icon;
+  final Color color;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+
+  const _QuickActionCard({
+    required this.icon,
+    required this.color,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(14),
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.07),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: color.withOpacity(0.22)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.15),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(icon, color: color, size: 20),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              title,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                fontWeight: FontWeight.w700,
+                color: color,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              subtitle,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurface.withOpacity(0.55),
+                fontSize: 11,
+              ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Courier mode card (stateful) ──────────────────────────────────────────────
+
+class _CourierModeCard extends StatefulWidget {
+  const _CourierModeCard();
+
+  @override
+  State<_CourierModeCard> createState() => _CourierModeCardState();
+}
+
+class _CourierModeCardState extends State<_CourierModeCard> {
+  bool _checking = false;
+
+  Future<void> _handleTap() async {
+    if (_checking) return;
+    setState(() => _checking = true);
+    try {
+      final profile = await GetIt.instance<P2pCourierRepository>().getMyProfile();
+      if (!mounted) return;
+      if (profile != null) {
+        context.push('/p2p/courier/dashboard');
+      } else {
+        context.push('/p2p/courier/apply');
+      }
+    } catch (_) {
+      if (mounted) context.push('/p2p/courier/apply');
+    } finally {
+      if (mounted) setState(() => _checking = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    const color = AppTheme.primaryColor;
+
+    return InkWell(
+      onTap: _checking ? null : _handleTap,
+      borderRadius: BorderRadius.circular(14),
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.07),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: color.withOpacity(0.22)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: color.withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(Icons.flight_takeoff_rounded, color: color, size: 20),
+                ),
+                if (_checking)
+                  const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(
+                      color: color,
+                      strokeWidth: 2,
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Text(
+              'Courier Mode',
+              style: theme.textTheme.bodyMedium?.copyWith(
+                fontWeight: FontWeight.w700,
+                color: color,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              'Carry packages & earn on your travels',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurface.withOpacity(0.55),
+                fontSize: 11,
+              ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Shipment list ─────────────────────────────────────────────────────────────
+
+class _ShipmentList extends StatelessWidget {
+  final bool Function(ShipmentEntity) filter;
+  final String emptyTitle;
+  final String emptySubtitle;
+  final IconData emptyIcon;
+
+  const _ShipmentList({
+    required this.filter,
+    required this.emptyTitle,
+    required this.emptySubtitle,
+    required this.emptyIcon,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final subtitleColor = theme.colorScheme.onSurface.withOpacity(0.4);
+
     return RefreshIndicator(
-      onRefresh: () async {
-        context.read<ShipmentListBloc>().add(const LoadShipments());
-      },
+      onRefresh: () async =>
+          context.read<ShipmentListBloc>().add(const LoadShipments()),
       child: BlocBuilder<ShipmentListBloc, ShipmentListState>(
         builder: (context, state) {
-          if (state.status == ShipmentListStatus.loading &&
-              state.shipments.isEmpty) {
+          if (state.status == ShipmentListStatus.loading && state.shipments.isEmpty) {
             return const Center(child: CircularProgressIndicator());
           }
           if (state.status == ShipmentListStatus.failure) {
             return OfflineErrorWidget(
               errorMessage: state.errorMessage ?? 'An error occurred',
-              onRetry: () {
-                context.read<ShipmentListBloc>().add(const LoadShipments());
-              },
+              onRetry: () =>
+                  context.read<ShipmentListBloc>().add(const LoadShipments()),
             );
           }
 
-          final filteredShipments = state.shipments.where(filter).toList();
+          final filtered = state.shipments.where(filter).toList();
 
-          if (filteredShipments.isEmpty) {
-            // Must filter state shipments to check if empty
+          if (filtered.isEmpty) {
             return Center(
-              child: Padding(
-                padding: const EdgeInsets.all(24.0),
-                child: GlassContainer(
-                  child: Padding(
-                    padding: const EdgeInsets.all(32.0),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.inventory_2_outlined,
-                          size: 64,
-                          color: Theme.of(
-                            context,
-                          ).colorScheme.onSurface.withOpacity(0.24),
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          'No shipments found',
-                          style: Theme.of(context).textTheme.titleLarge
-                              ?.copyWith(
-                                color: Theme.of(context).colorScheme.onSurface,
-                                fontWeight: FontWeight.bold,
-                              ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Your shipment history will appear here.',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            color: Theme.of(
-                              context,
-                            ).colorScheme.onSurface.withOpacity(0.6),
-                          ),
-                        ),
-                      ],
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(24),
+                    decoration: BoxDecoration(
+                      color: subtitleColor.withOpacity(0.08),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(emptyIcon, size: 48, color: subtitleColor),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    emptyTitle,
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      color: theme.colorScheme.onSurface,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
-                ),
+                  const SizedBox(height: 6),
+                  Text(
+                    emptySubtitle,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: subtitleColor, fontSize: 13),
+                  ),
+                ],
               ),
             );
           }
 
           return ListView.builder(
-            padding: const EdgeInsets.fromLTRB(16, 24, 16, 100),
-            itemCount: filteredShipments.length,
-            itemBuilder: (context, index) {
-              final shipment = filteredShipments[index];
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 16.0),
-                child: _ShipmentGlassCard(shipment: shipment),
-              );
-            },
+            padding: const EdgeInsets.fromLTRB(16, 20, 16, 100),
+            itemCount: filtered.length,
+            itemBuilder: (context, index) => Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: _ShipmentCard(shipment: filtered[index]),
+            ),
           );
         },
       ),
     );
   }
 }
+
+// ── Tab bar delegate ──────────────────────────────────────────────────────────
 
 class _SliverTabBarDelegate extends SliverPersistentHeaderDelegate {
   final TabBar _tabBar;
@@ -518,242 +740,280 @@ class _SliverTabBarDelegate extends SliverPersistentHeaderDelegate {
   _SliverTabBarDelegate(this._tabBar, {required Color color}) : _color = color;
 
   @override
-  double get minExtent => _tabBar.preferredSize.height;
+  double get minExtent => _tabBar.preferredSize.height + 12;
   @override
-  double get maxExtent => _tabBar.preferredSize.height;
+  double get maxExtent => _tabBar.preferredSize.height + 12;
 
   @override
-  Widget build(
-    BuildContext context,
-    double shrinkOffset,
-    bool overlapsContent,
-  ) {
+  Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
     return Container(color: _color, child: _tabBar);
   }
 
   @override
-  bool shouldRebuild(_SliverTabBarDelegate oldDelegate) {
-    return false;
-  }
+  bool shouldRebuild(_SliverTabBarDelegate oldDelegate) => false;
 }
 
-class _ShipmentGlassCard extends StatelessWidget {
+// ── Shipment card ─────────────────────────────────────────────────────────────
+
+class _ShipmentCard extends StatelessWidget {
   final ShipmentEntity shipment;
 
-  const _ShipmentGlassCard({required this.shipment});
+  const _ShipmentCard({required this.shipment});
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colors = theme.extension<AppColorsExtension>();
+    final textColor = theme.colorScheme.onSurface;
+    final subtitleColor = theme.colorScheme.onSurface.withOpacity(0.55);
+    final primaryColor = theme.colorScheme.primary;
 
-    // Status Logic
-    Color statusColor;
-    switch (shipment.status.toUpperCase()) {
-      case 'DELIVERED':
-        statusColor = colors?.success ?? Colors.green;
-        break;
-      case 'IN_TRANSIT':
-        statusColor = theme.colorScheme.primary;
-        break;
-      case 'BOOKED':
-        statusColor = colors?.warning ?? Colors.orange;
-        break;
-      case 'READY_FOR_PICKUP':
-        statusColor = Colors.teal;
-        break;
-      case 'PICKED_UP':
-        statusColor = Colors.cyan;
-        break;
-      case 'DELAYED':
-        statusColor = Colors.red;
-        break;
-      case 'QUOTATION_ACCEPTED':
-      case 'ACCEPTED':
-        statusColor = Colors.indigo;
-        break;
-      case 'PAYMENT_PENDING':
-        statusColor = Colors.deepOrange;
-        break;
-      default:
-        statusColor = Colors.grey;
-    }
+    final statusColor = _statusColor(shipment.status, colors, primaryColor);
+    final statusLabel = _localizedStatus(context, shipment.status);
+    final statusIcon = _statusIcon(shipment.status);
 
     return Hero(
       tag: 'shipment-${shipment.id}',
       child: AnimatedScaleButton(
         onPressed: () => context.push('/shipment-details', extra: shipment),
-        child: GlassContainer(
-          padding: const EdgeInsets.all(20),
+        child: Container(
+          decoration: BoxDecoration(
+            color: theme.colorScheme.surface,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: theme.colorScheme.outline.withOpacity(0.2)),
+          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 6,
-                    ),
-                    decoration: BoxDecoration(
-                      color: statusColor.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: statusColor.withOpacity(0.5)),
-                    ),
-                    child: Text(
-                      _getLocalizedStatus(
-                        context,
-                        shipment.status,
-                      ).toUpperCase(),
-                      style: TextStyle(
-                        color: statusColor,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 10,
-                        letterSpacing: 1.0,
+              // Status row
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
+                child: Row(
+                  children: [
+                    Container(
+                      padding:
+                          const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+                      decoration: BoxDecoration(
+                        color: statusColor.withOpacity(0.12),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(statusIcon, color: statusColor, size: 12),
+                          const SizedBox(width: 4),
+                          Text(
+                            statusLabel.toUpperCase(),
+                            style: TextStyle(
+                              color: statusColor,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 10,
+                              letterSpacing: 0.6,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                  ),
-                  Text(
-                    shipment.serviceLevel.replaceAll('_', ' '),
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurface.withOpacity(0.7),
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 20),
-              Row(
-                children: [
-                  _buildLocationDot(theme.colorScheme.primary),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      shipment.originAddress,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                    const Spacer(),
+                    Text(
+                      shipment.serviceLevel.replaceAll('_', ' '),
                       style: TextStyle(
-                        color: theme.colorScheme.onSurface,
-                        fontSize: 16,
+                        color: subtitleColor,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-              Container(
-                margin: const EdgeInsets.only(left: 6),
-                height: 20,
-                decoration: BoxDecoration(
-                  border: Border(
-                    left: BorderSide(
-                      color: theme.colorScheme.onSurface.withOpacity(0.2),
-                      width: 1,
+
+              // Route
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 10,
+                      height: 10,
+                      decoration: BoxDecoration(
+                        color: primaryColor,
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                              color: primaryColor.withOpacity(0.4),
+                              blurRadius: 5,
+                              spreadRadius: 1),
+                        ],
+                      ),
                     ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        shipment.originAddress,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                            color: textColor, fontSize: 14, fontWeight: FontWeight.w500),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.only(left: 20),
+                child: SizedBox(
+                  height: 16,
+                  child: VerticalDivider(
+                    color: theme.colorScheme.outline.withOpacity(0.3),
+                    width: 1,
+                    thickness: 1,
                   ),
                 ),
               ),
-              Row(
-                children: [
-                  _buildLocationDot(theme.colorScheme.secondary),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      shipment.destinationAddress,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: theme.colorScheme.onSurface,
-                        fontSize: 16,
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 10,
+                      height: 10,
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.secondary,
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                              color: theme.colorScheme.secondary.withOpacity(0.4),
+                              blurRadius: 5,
+                              spreadRadius: 1),
+                        ],
                       ),
                     ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 20),
-              Divider(color: theme.colorScheme.onSurface.withOpacity(0.1)),
-              const SizedBox(height: 8),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    '${shipment.cargoItems.length} ITEMS',
-                    style: TextStyle(
-                      color: theme.colorScheme.onSurface.withOpacity(0.54),
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  if (shipment.estimatedPrice != null)
-                    Text(
-                      '\$${shipment.estimatedPrice!.toStringAsFixed(2)}',
-                      style: TextStyle(
-                        color: colors?.success ?? Colors.green,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        shipment.destinationAddress,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                            color: textColor, fontSize: 14, fontWeight: FontWeight.w500),
                       ),
                     ),
-                ],
+                  ],
+                ),
               ),
+
+              // Footer: cargo count + price + tracking
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                child: Divider(
+                    color: theme.colorScheme.outline.withOpacity(0.15), height: 1),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+                child: Row(
+                  children: [
+                    // Cargo count
+                    Container(
+                      padding:
+                          const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.outline.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        '${shipment.cargoItems.length} item${shipment.cargoItems.length != 1 ? 's' : ''}',
+                        style: TextStyle(
+                            color: subtitleColor,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                    if (shipment.trackingNumber != null &&
+                        shipment.trackingNumber!.isNotEmpty) ...[
+                      const SizedBox(width: 8),
+                      Icon(Icons.qr_code_rounded, size: 12, color: subtitleColor),
+                      const SizedBox(width: 3),
+                      Text(
+                        shipment.trackingNumber!,
+                        style: TextStyle(
+                          color: subtitleColor,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                    const Spacer(),
+                    if (shipment.estimatedPrice != null)
+                      Text(
+                        '\$${shipment.estimatedPrice!.toStringAsFixed(2)}',
+                        style: TextStyle(
+                          color: colors?.success ?? Colors.green,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 14,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+
+              // Review / review-submitted
               if (_canLeaveReview(context)) ...[
-                const SizedBox(height: 16),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton.icon(
-                    onPressed: () => _showReviewDialog(context),
-                    icon: const Icon(Icons.star, color: Colors.white, size: 18),
-                    label: Text(
-                      AppLocalizations.of(context)!.rateReviewAgent,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 13,
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: () => _showReviewDialog(context),
+                      icon: const Icon(Icons.star_rounded, color: Colors.white, size: 16),
+                      label: Text(
+                        AppLocalizations.of(context)!.rateReviewAgent,
+                        style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 13),
                       ),
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.amber[700],
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.amber[700],
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10)),
+                        elevation: 0,
                       ),
-                      elevation: 0,
                     ),
                   ),
                 ),
               ] else if (_hasAlreadyReviewed(context)) ...[
-                const SizedBox(height: 16),
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(
-                    vertical: 10,
-                    horizontal: 16,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.green.shade50,
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: Colors.green.shade200),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        Icons.check_circle,
-                        color: Colors.green.shade600,
-                        size: 18,
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        'Review Submitted',
-                        style: TextStyle(
-                          color: Colors.green.shade700,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 13,
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+                  child: Container(
+                    width: double.infinity,
+                    padding:
+                        const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
+                    decoration: BoxDecoration(
+                      color: Colors.green.shade50,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: Colors.green.shade200),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.check_circle_rounded,
+                            color: Colors.green.shade600, size: 16),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Review Submitted',
+                          style: TextStyle(
+                              color: Colors.green.shade700,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 13),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               ],
+
+              const SizedBox(height: 14),
             ],
           ),
         ),
@@ -761,7 +1021,57 @@ class _ShipmentGlassCard extends StatelessWidget {
     );
   }
 
-  String _getLocalizedStatus(BuildContext context, String status) {
+  Color _statusColor(String status, AppColorsExtension? colors, Color primary) {
+    switch (status.toUpperCase()) {
+      case 'DELIVERED':
+        return colors?.success ?? Colors.green;
+      case 'IN_TRANSIT':
+      case 'OUT_FOR_DELIVERY':
+        return primary;
+      case 'BOOKED':
+      case 'PAYMENT_PENDING':
+        return colors?.warning ?? Colors.orange;
+      case 'READY_FOR_PICKUP':
+      case 'PICKED_UP':
+        return Colors.teal;
+      case 'DELAYED':
+      case 'CANCELLED':
+        return Colors.red;
+      case 'QUOTATION_ACCEPTED':
+      case 'ACCEPTED':
+        return Colors.indigo;
+      default:
+        return Colors.grey;
+    }
+  }
+
+  IconData _statusIcon(String status) {
+    switch (status.toUpperCase()) {
+      case 'DELIVERED':
+        return Icons.check_circle_rounded;
+      case 'IN_TRANSIT':
+      case 'OUT_FOR_DELIVERY':
+        return Icons.local_shipping_rounded;
+      case 'BOOKED':
+        return Icons.book_online_rounded;
+      case 'READY_FOR_PICKUP':
+      case 'PICKED_UP':
+        return Icons.inventory_2_rounded;
+      case 'DELAYED':
+        return Icons.warning_amber_rounded;
+      case 'CANCELLED':
+        return Icons.cancel_rounded;
+      case 'IN_CUSTOMS':
+      case 'CUSTOMS_CLEARED':
+        return Icons.account_balance_rounded;
+      case 'PAYMENT_PENDING':
+        return Icons.payment_rounded;
+      default:
+        return Icons.circle_outlined;
+    }
+  }
+
+  String _localizedStatus(BuildContext context, String status) {
     final l10n = AppLocalizations.of(context)!;
     switch (status.toUpperCase()) {
       case 'REQUESTED':
@@ -785,9 +1095,9 @@ class _ShipmentGlassCard extends StatelessWidget {
       case 'PICKED_UP':
         return 'Picked Up';
       case 'RECEIVED_AT_WAREHOUSE':
-        return 'Received at Warehouse';
+        return 'At Warehouse';
       case 'LEAVING_ORIGIN_COUNTRY':
-        return 'Leaving Origin Country';
+        return 'Leaving Origin';
       case 'IN_TRANSIT':
         return l10n.statusInTransit;
       case 'IN_CUSTOMS':
@@ -795,7 +1105,7 @@ class _ShipmentGlassCard extends StatelessWidget {
       case 'CUSTOMS_CLEARED':
         return l10n.customsCleared;
       case 'REACHED_DESTINATION_COUNTRY':
-        return 'Reached Destination Country';
+        return 'At Destination Country';
       case 'ARRIVED_AT_DESTINATION':
         return l10n.arrivedAtDestination;
       case 'ARRIVED_AT_PORT':
@@ -814,9 +1124,9 @@ class _ShipmentGlassCard extends StatelessWidget {
   }
 
   bool _canLeaveReview(BuildContext context) {
-    if (shipment.status.toUpperCase() != 'DELIVERED' ||
-        shipment.agentId == null)
+    if (shipment.status.toUpperCase() != 'DELIVERED' || shipment.agentId == null) {
       return false;
+    }
     final authState = context.read<AuthBloc>().state;
     if (authState.user?.role == 'AGENT') return false;
     final userId = authState.user?.id;
@@ -825,9 +1135,9 @@ class _ShipmentGlassCard extends StatelessWidget {
   }
 
   bool _hasAlreadyReviewed(BuildContext context) {
-    if (shipment.status.toUpperCase() != 'DELIVERED' ||
-        shipment.agentId == null)
+    if (shipment.status.toUpperCase() != 'DELIVERED' || shipment.agentId == null) {
       return false;
+    }
     final authState = context.read<AuthBloc>().state;
     if (authState.user?.role == 'AGENT') return false;
     final userId = authState.user?.id;
@@ -849,9 +1159,8 @@ class _ShipmentGlassCard extends StatelessWidget {
             return true;
           } catch (e) {
             if (context.mounted) {
-              ScaffoldMessenger.of(
-                context,
-              ).showSnackBar(SnackBar(content: Text('Failed: $e')));
+              ScaffoldMessenger.of(context)
+                  .showSnackBar(SnackBar(content: Text('Failed: $e')));
             }
             return false;
           }
@@ -868,19 +1177,14 @@ class _ShipmentGlassCard extends StatelessWidget {
             backgroundColor: Colors.green.shade600,
             behavior: SnackBarBehavior.floating,
             margin: const EdgeInsets.all(16),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             content: const Row(
               children: [
-                Icon(Icons.check_circle, color: Colors.white, size: 20),
+                Icon(Icons.check_circle_rounded, color: Colors.white, size: 20),
                 SizedBox(width: 10),
                 Text(
                   'Review submitted! Thank you for your feedback.',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w500,
-                  ),
+                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.w500),
                 ),
               ],
             ),
@@ -889,200 +1193,71 @@ class _ShipmentGlassCard extends StatelessWidget {
       context.read<ShipmentListBloc>().add(const LoadShipments());
     }
   }
-
-  Widget _buildLocationDot(Color color) {
-    return Container(
-      width: 12,
-      height: 12,
-      decoration: BoxDecoration(
-        color: color,
-        shape: BoxShape.circle,
-        boxShadow: [
-          BoxShadow(
-            color: color.withOpacity(0.5),
-            blurRadius: 6,
-            spreadRadius: 1,
-          ),
-        ],
-      ),
-    );
-  }
 }
 
-// ── P2P Send entry card ────────────────────────────────────────────────────────
+// ── Ship type option tile (bottom sheet) ──────────────────────────────────────
 
-class _P2pSendCard extends StatelessWidget {
+class _ShipOptionTile extends StatelessWidget {
+  final IconData icon;
+  final Color color;
+  final String title;
+  final String subtitle;
   final VoidCallback onTap;
-  const _P2pSendCard({required this.onTap});
+
+  const _ShipOptionTile({
+    required this.icon,
+    required this.color,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(14),
+      borderRadius: BorderRadius.circular(16),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+        padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [
-              Colors.teal.withAlpha(30),
-              Colors.teal.withAlpha(12),
-            ],
-          ),
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: Colors.teal.withAlpha(60)),
+          color: color.withOpacity(0.06),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: color.withOpacity(0.25)),
         ),
         child: Row(
           children: [
             Container(
-              width: 40,
-              height: 40,
+              width: 48,
+              height: 48,
               decoration: BoxDecoration(
-                color: Colors.teal.withAlpha(40),
-                borderRadius: BorderRadius.circular(12),
+                color: color.withOpacity(0.15),
+                borderRadius: BorderRadius.circular(14),
               ),
-              child: const Icon(
-                Icons.send_rounded,
-                color: Colors.teal,
-                size: 20,
-              ),
+              child: Icon(icon, color: color, size: 24),
             ),
-            const SizedBox(width: 10),
+            const SizedBox(width: 16),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Send via P2P',
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      fontWeight: FontWeight.w700,
-                      color: Colors.teal[700],
-                    ),
+                    title,
+                    style: theme.textTheme.titleMedium
+                        ?.copyWith(fontWeight: FontWeight.w700, color: color),
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    'Ship with a traveler',
+                    subtitle,
                     style: theme.textTheme.bodySmall?.copyWith(
-                      color: Colors.teal[600],
-                      fontSize: 11,
+                      color: theme.colorScheme.onSurface.withOpacity(0.6),
                     ),
                   ),
                 ],
               ),
             ),
             Icon(Icons.arrow_forward_ios_rounded,
-                size: 12, color: Colors.teal.withAlpha(180)),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// ── Courier Mode entry card ────────────────────────────────────────────────────
-
-class _CourierModeCard extends StatefulWidget {
-  const _CourierModeCard();
-
-  @override
-  State<_CourierModeCard> createState() => _CourierModeCardState();
-}
-
-class _CourierModeCardState extends State<_CourierModeCard> {
-  bool _checking = false;
-
-  Future<void> _handleTap() async {
-    if (_checking) return;
-    setState(() => _checking = true);
-    try {
-      final profile =
-          await GetIt.instance<P2pCourierRepository>().getMyProfile();
-      if (!mounted) return;
-      if (profile != null) {
-        context.push('/p2p/courier/dashboard');
-      } else {
-        context.push('/p2p/courier/onboarding');
-      }
-    } catch (_) {
-      if (mounted) context.push('/p2p/courier/onboarding');
-    } finally {
-      if (mounted) setState(() => _checking = false);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return InkWell(
-      onTap: _checking ? null : _handleTap,
-      borderRadius: BorderRadius.circular(14),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [
-              AppTheme.primaryColor.withAlpha(30),
-              AppTheme.primaryColor.withAlpha(12),
-            ],
-          ),
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: AppTheme.primaryColor.withAlpha(60)),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                color: AppTheme.primaryColor.withAlpha(40),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: const Icon(
-                Icons.flight_takeoff_rounded,
-                color: AppTheme.primaryColor,
-                size: 22,
-              ),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Courier Mode',
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      fontWeight: FontWeight.w700,
-                      color: AppTheme.primaryColor,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    'Carry packages on your travels and earn income.',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: AppTheme.primaryColor.withOpacity(0.7),
-                      fontSize: 12,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 8),
-            _checking
-                ? const SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(
-                      color: AppTheme.primaryColor,
-                      strokeWidth: 2,
-                    ),
-                  )
-                : const Icon(
-                    Icons.arrow_forward_ios_rounded,
-                    size: 14,
-                    color: AppTheme.primaryColor,
-                  ),
+                size: 14, color: color.withOpacity(0.6)),
           ],
         ),
       ),
