@@ -8,6 +8,7 @@ import 'package:customer_nzubia_global/features/p2p/domain/enums/p2p_enums.dart'
 import 'package:customer_nzubia_global/features/p2p/domain/models/p2p_courier_profile.dart';
 import 'package:customer_nzubia_global/features/p2p/domain/models/p2p_route.dart';
 import 'package:customer_nzubia_global/features/p2p/domain/models/p2p_courier_request.dart';
+import 'package:customer_nzubia_global/features/p2p/domain/models/p2p_shipment_request.dart';
 import 'package:customer_nzubia_global/features/p2p/presentation/bloc/courier_dashboard/courier_dashboard_bloc.dart';
 
 class CourierDashboardScreen extends StatelessWidget {
@@ -176,6 +177,37 @@ class _DashboardView extends StatelessWidget {
 
                       const SizedBox(height: 16),
 
+                      // Quick-action buttons
+                      if (canPostRoutes) ...[
+                        Row(
+                          children: [
+                            Expanded(
+                              child: OutlinedButton.icon(
+                                icon: const Icon(Icons.local_shipping_outlined),
+                                label: const Text('Browse Shipments'),
+                                onPressed: () => context
+                                    .push('/p2p/courier/matched-shipments'),
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: OutlinedButton.icon(
+                                icon: const Icon(
+                                    Icons.mark_email_unread_outlined),
+                                label: Text(
+                                  state.pendingRequests.isNotEmpty
+                                      ? 'Requests (${state.pendingRequests.length})'
+                                      : 'Requests',
+                                ),
+                                onPressed: () =>
+                                    context.push('/p2p/courier/requests'),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+                      ],
+
                       // All routes list (so couriers can publish drafts)
                       if (state.myRoutes.isNotEmpty)
                         _MyRoutesSection(routes: state.myRoutes),
@@ -185,6 +217,12 @@ class _DashboardView extends StatelessWidget {
                       // Incoming offer list
                       _IncomingRequestsSection(
                           requests: state.pendingRequests),
+
+                      const SizedBox(height: 16),
+
+                      // Active shipments assigned to this courier
+                      _ActiveShipmentsSection(
+                          shipments: state.activeShipments),
                     ],
                   ),
                 );
@@ -1132,5 +1170,229 @@ class _ErrorPanel extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+// ─── Active shipments section ─────────────────────────────────────────────────
+
+class _ActiveShipmentsSection extends StatelessWidget {
+  final List<P2pShipmentRequest> shipments;
+
+  const _ActiveShipmentsSection({required this.shipments});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Text(
+              'My Active Shipments',
+              style: theme.textTheme.bodyMedium?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(width: 8),
+            if (shipments.isNotEmpty)
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                decoration: BoxDecoration(
+                  color: AppTheme.primaryColor,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  shipments.length.toString(),
+                  style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700),
+                ),
+              ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        if (shipments.isEmpty)
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.surface,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                  color: theme.colorScheme.outline.withOpacity(0.5)),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.local_shipping_outlined,
+                    color: theme.colorScheme.outline, size: 32),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'No active deliveries. Accepted shipments will appear here.',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurface.withOpacity(0.45)),
+                  ),
+                ),
+              ],
+            ),
+          )
+        else
+          ...shipments.map((s) => _ActiveShipmentTile(shipment: s)),
+      ],
+    );
+  }
+}
+
+class _ActiveShipmentTile extends StatelessWidget {
+  final P2pShipmentRequest shipment;
+
+  const _ActiveShipmentTile({required this.shipment});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final (statusColor, statusLabel) = _statusStyle(shipment.status);
+
+    return GestureDetector(
+      onTap: () {
+        final s = shipment.status;
+        if (s == ShipmentRequestStatus.handoffPending) {
+          context.push(
+              '/p2p/courier/shipment/${shipment.id}/pickup');
+        } else {
+          context.push(
+              '/p2p/courier/shipment/${shipment.id}/in-transit');
+        }
+      },
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 10),
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surface,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+              color: theme.colorScheme.outline.withOpacity(0.5)),
+          boxShadow: [
+            BoxShadow(color: Colors.black.withAlpha(6), blurRadius: 3),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: statusColor.withAlpha(20),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(Icons.local_shipping_outlined,
+                      color: statusColor, size: 18),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '→ ${shipment.destinationCity}, ${shipment.destinationCountry}',
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                            fontWeight: FontWeight.w600),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      Text(
+                        shipment.itemDescription,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurface
+                              .withOpacity(0.55),
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: statusColor.withAlpha(22),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    statusLabel,
+                    style: TextStyle(
+                      color: statusColor,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Icon(Icons.scale_outlined,
+                    size: 13,
+                    color: theme.colorScheme.onSurface.withOpacity(0.45)),
+                const SizedBox(width: 4),
+                Text(
+                  '${shipment.weightKg} kg',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurface.withOpacity(0.55)),
+                ),
+                const SizedBox(width: 14),
+                Icon(Icons.attach_money,
+                    size: 13,
+                    color: theme.colorScheme.onSurface.withOpacity(0.45)),
+                Text(
+                  '\$${shipment.declaredValueUsd.toStringAsFixed(0)} declared',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurface.withOpacity(0.55)),
+                ),
+              ],
+            ),
+            if (shipment.status == ShipmentRequestStatus.handoffPending) ...[
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  const Icon(Icons.timer_outlined,
+                      size: 14, color: Colors.orange),
+                  const SizedBox(width: 6),
+                  Text(
+                    'Awaiting package handoff from sender',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: Colors.orange[800],
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  (Color, String) _statusStyle(ShipmentRequestStatus s) {
+    switch (s) {
+      case ShipmentRequestStatus.handoffPending:
+        return (Colors.orange[700]!, 'Handoff Pending');
+      case ShipmentRequestStatus.inTransit:
+        return (AppTheme.primaryColor, 'In Transit');
+      case ShipmentRequestStatus.delivered:
+        return (Colors.green[700]!, 'Delivered');
+      default:
+        return (Colors.grey[600]!, s.label);
+    }
   }
 }

@@ -163,6 +163,7 @@ Future<void> setupServiceLocator() async {
     () => CourierDashboardBloc(
       courierRepository: sl<P2pCourierRepository>(),
       routeRepository: sl<P2pRouteRepository>(),
+      shipmentRepository: sl<P2pShipmentRepository>(),
     ),
   );
 

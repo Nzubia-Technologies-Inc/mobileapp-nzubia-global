@@ -27,6 +27,9 @@ class P2pShipmentRequest extends Equatable {
   /// shipment ID as the deterministic room name in the messaging UI.
   final String? chatThreadId;
 
+  /// 6-digit code generated when handoff is recorded; emailed to the seeker.
+  final String? pickupConfirmationCode;
+
   final DateTime? createdAt;
   final DateTime? updatedAt;
 
@@ -48,6 +51,7 @@ class P2pShipmentRequest extends Equatable {
     required this.status,
     this.matchMetadata,
     this.chatThreadId,
+    this.pickupConfirmationCode,
     this.createdAt,
     this.updatedAt,
   });
@@ -88,6 +92,7 @@ class P2pShipmentRequest extends Equatable {
           ? Map<String, dynamic>.from(json['match_metadata'] as Map)
           : null,
       chatThreadId: json['chat_thread_id'] as String?,
+      pickupConfirmationCode: json['pickup_confirmation_code'] as String?,
       createdAt: json['created_at'] != null
           ? DateTime.parse(json['created_at'] as String)
           : null,
@@ -116,6 +121,7 @@ class P2pShipmentRequest extends Equatable {
         status,
         matchMetadata,
         chatThreadId,
+        pickupConfirmationCode,
         createdAt,
         updatedAt,
       ];

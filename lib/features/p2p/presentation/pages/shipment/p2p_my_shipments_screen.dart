@@ -103,7 +103,7 @@ class _ShipmentCard extends StatelessWidget {
     final (statusColor, statusLabel) = _statusStyle(shipment.status);
 
     return GestureDetector(
-      onTap: () => context.push('/p2p/shipment/${shipment.id}'),
+      onTap: () => context.push(_routeForStatus(shipment)),
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
@@ -242,6 +242,26 @@ class _ShipmentCard extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  String _routeForStatus(P2pShipmentRequest s) {
+    switch (s.status) {
+      case ShipmentRequestStatus.open:
+      case ShipmentRequestStatus.draft:
+        return '/p2p/shipment/${s.id}/offers';
+      case ShipmentRequestStatus.matched:
+      case ShipmentRequestStatus.reserved:
+        return '/p2p/shipment/${s.id}/handoff';
+      case ShipmentRequestStatus.handoffPending:
+        return '/p2p/shipment/${s.id}/handoff';
+      case ShipmentRequestStatus.inTransit:
+      case ShipmentRequestStatus.delivered:
+      case ShipmentRequestStatus.completed:
+      case ShipmentRequestStatus.disputed:
+        return '/p2p/shipment/${s.id}/tracking';
+      default:
+        return '/p2p/shipment/${s.id}';
+    }
   }
 
   (Color, String) _statusStyle(ShipmentRequestStatus status) {

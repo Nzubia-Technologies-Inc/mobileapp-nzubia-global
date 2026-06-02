@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 // ── P2P ───────────────────────────────────────────────────────────────────────
 import 'package:customer_nzubia_global/features/p2p/presentation/pages/p2p_marketplace_screen.dart';
 import 'package:customer_nzubia_global/features/p2p/presentation/pages/courier/courier_apply_screen.dart';
+import 'package:customer_nzubia_global/features/p2p/presentation/pages/courier/courier_onboarding_screen.dart';
 import 'package:customer_nzubia_global/features/p2p/presentation/pages/courier/courier_identity_screen.dart';
 import 'package:customer_nzubia_global/features/p2p/presentation/pages/courier/courier_documents_screen.dart';
 import 'package:customer_nzubia_global/features/p2p/presentation/pages/courier/courier_route_screen.dart';
@@ -11,11 +12,20 @@ import 'package:customer_nzubia_global/features/p2p/presentation/pages/courier/p
 import 'package:customer_nzubia_global/features/p2p/presentation/pages/courier/courier_compliance_screen.dart';
 import 'package:customer_nzubia_global/features/p2p/presentation/pages/courier/courier_review_screen.dart';
 import 'package:customer_nzubia_global/features/p2p/presentation/pages/courier/courier_dashboard_screen.dart';
+import 'package:customer_nzubia_global/features/p2p/presentation/pages/courier/courier_matched_shipments_screen.dart';
+import 'package:customer_nzubia_global/features/p2p/presentation/pages/courier/courier_requests_screen.dart';
+import 'package:customer_nzubia_global/features/p2p/presentation/pages/courier/courier_pickup_screen.dart';
+import 'package:customer_nzubia_global/features/p2p/presentation/pages/courier/courier_in_transit_screen.dart';
 import 'package:customer_nzubia_global/features/p2p/presentation/pages/courier/couriers_list_screen.dart';
 import 'package:customer_nzubia_global/features/p2p/presentation/pages/courier/courier_profile_screen.dart';
 import 'package:customer_nzubia_global/features/p2p/presentation/pages/shipment/p2p_create_shipment_screen.dart';
 import 'package:customer_nzubia_global/features/p2p/presentation/pages/shipment/p2p_shipment_detail_screen.dart';
 import 'package:customer_nzubia_global/features/p2p/presentation/pages/shipment/p2p_my_shipments_screen.dart';
+import 'package:customer_nzubia_global/features/p2p/presentation/pages/shipment/p2p_awaiting_offers_screen.dart';
+import 'package:customer_nzubia_global/features/p2p/presentation/pages/shipment/p2p_waiver_screen.dart';
+import 'package:customer_nzubia_global/features/p2p/presentation/pages/shipment/p2p_handoff_screen.dart';
+import 'package:customer_nzubia_global/features/p2p/presentation/pages/shipment/p2p_tracking_screen.dart';
+import 'package:customer_nzubia_global/features/p2p/presentation/pages/shipment/p2p_review_screen.dart';
 import 'package:customer_nzubia_global/features/p2p/presentation/pages/compliance_screen.dart';
 
 import 'package:customer_nzubia_global/features/auth/presentation/pages/splash_screen.dart';
@@ -145,6 +155,11 @@ class AppRouter {
         builder: (context, state) => const CourierApplyScreen(),
       ),
       GoRoute(
+        path: '/p2p/courier/onboarding',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) => const CourierOnboardingScreen(),
+      ),
+      GoRoute(
         path: '/p2p/courier/identity',
         parentNavigatorKey: _rootNavigatorKey,
         builder: (context, state) => const CourierIdentityScreen(),
@@ -174,6 +189,32 @@ class AppRouter {
         parentNavigatorKey: _rootNavigatorKey,
         builder: (context, state) => const PostRouteScreen(),
       ),
+      GoRoute(
+        path: '/p2p/courier/matched-shipments',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) => const CourierMatchedShipmentsScreen(),
+      ),
+      GoRoute(
+        path: '/p2p/courier/requests',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) => const CourierRequestsScreen(),
+      ),
+      GoRoute(
+        path: '/p2p/courier/shipment/:id/pickup',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) {
+          final id = state.pathParameters['id']!;
+          return CourierPickupScreen(shipmentId: id);
+        },
+      ),
+      GoRoute(
+        path: '/p2p/courier/shipment/:id/in-transit',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) {
+          final id = state.pathParameters['id']!;
+          return CourierInTransitScreen(shipmentId: id);
+        },
+      ),
       // ── P2P shipment (full-screen) ────────────────────────────────────────
       GoRoute(
         path: '/p2p/my-shipments',
@@ -193,6 +234,51 @@ class AppRouter {
           return P2pShipmentDetailScreen(shipmentId: id);
         },
       ),
+      GoRoute(
+        path: '/p2p/shipment/:id/offers',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) {
+          final id = state.pathParameters['id']!;
+          final extra = state.extra as Map<String, dynamic>?;
+          return P2pAwaitingOffersScreen(
+            shipmentId: id,
+            destinationCity: extra?['destinationCity'] as String?,
+            destinationCountry: extra?['destinationCountry'] as String?,
+          );
+        },
+      ),
+      GoRoute(
+        path: '/p2p/shipment/:id/waiver',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) {
+          final id = state.pathParameters['id']!;
+          return P2pWaiverScreen(shipmentId: id);
+        },
+      ),
+      GoRoute(
+        path: '/p2p/shipment/:id/handoff',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) {
+          final id = state.pathParameters['id']!;
+          return P2pHandoffScreen(shipmentId: id);
+        },
+      ),
+      GoRoute(
+        path: '/p2p/shipment/:id/tracking',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) {
+          final id = state.pathParameters['id']!;
+          return P2pTrackingScreen(shipmentId: id);
+        },
+      ),
+      GoRoute(
+        path: '/p2p/shipment/:id/review',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) {
+          final id = state.pathParameters['id']!;
+          return P2pReviewScreen(shipmentId: id);
+        },
+      ),
       // ── Couriers list (full-screen) ──────────────────────────────────────
       GoRoute(
         path: '/p2p/couriers',
@@ -206,6 +292,71 @@ class AppRouter {
         builder: (context, state) {
           final id = state.pathParameters['id']!;
           return CourierProfileScreen(courierId: id);
+        },
+      ),
+
+      // ── Alias routes (spec-friendly /p2p/seeker/* and short /p2p/courier/*) ─
+      GoRoute(
+        path: '/p2p/seeker/awaiting-offers/:id',
+        parentNavigatorKey: _rootNavigatorKey,
+        redirect: (_, state) =>
+            '/p2p/shipment/${state.pathParameters['id']}/offers',
+      ),
+      GoRoute(
+        path: '/p2p/seeker/waiver/:id',
+        parentNavigatorKey: _rootNavigatorKey,
+        redirect: (_, state) =>
+            '/p2p/shipment/${state.pathParameters['id']}/waiver',
+      ),
+      GoRoute(
+        path: '/p2p/seeker/handoff/:id',
+        parentNavigatorKey: _rootNavigatorKey,
+        redirect: (_, state) =>
+            '/p2p/shipment/${state.pathParameters['id']}/handoff',
+      ),
+      GoRoute(
+        path: '/p2p/seeker/tracking/:id',
+        parentNavigatorKey: _rootNavigatorKey,
+        redirect: (_, state) =>
+            '/p2p/shipment/${state.pathParameters['id']}/tracking',
+      ),
+      GoRoute(
+        path: '/p2p/seeker/review/:id',
+        parentNavigatorKey: _rootNavigatorKey,
+        redirect: (_, state) =>
+            '/p2p/shipment/${state.pathParameters['id']}/review',
+      ),
+      GoRoute(
+        path: '/p2p/seeker/courier-profile/:id',
+        parentNavigatorKey: _rootNavigatorKey,
+        redirect: (_, state) =>
+            '/p2p/couriers/${state.pathParameters['id']}',
+      ),
+      // Short courier aliases
+      GoRoute(
+        path: '/p2p/courier/route/new',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) => const PostRouteScreen(),
+      ),
+      GoRoute(
+        path: '/p2p/courier/shipments',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) => const CourierMatchedShipmentsScreen(),
+      ),
+      GoRoute(
+        path: '/p2p/courier/pickup/:id',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) {
+          final id = state.pathParameters['id']!;
+          return CourierPickupScreen(shipmentId: id);
+        },
+      ),
+      GoRoute(
+        path: '/p2p/courier/in-transit/:id',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) {
+          final id = state.pathParameters['id']!;
+          return CourierInTransitScreen(shipmentId: id);
         },
       ),
 

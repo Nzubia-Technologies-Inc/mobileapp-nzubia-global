@@ -51,11 +51,6 @@ class _MarketplaceViewState extends State<_MarketplaceView> {
             elevation: 0,
             actions: [
               IconButton(
-                icon: const Icon(Icons.search),
-                onPressed: () => context.push('/p2p/couriers'),
-                tooltip: 'Search couriers',
-              ),
-              IconButton(
                 icon: const Icon(Icons.receipt_long_outlined),
                 onPressed: () => context.push('/p2p/my-shipments'),
                 tooltip: 'My shipment requests',

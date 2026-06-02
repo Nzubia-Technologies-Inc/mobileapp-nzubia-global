@@ -79,7 +79,7 @@ class P2pShipmentBloc extends Bloc<P2pShipmentEvent, P2pShipmentState> {
     emit(state.copyWith(status: P2pShipmentStatus.loading));
     try {
       final request = await _repository.createRequest(event.requestData);
-      // DRAFT → OPEN so it becomes visible to couriers right away.
+      // DRAFT → OPEN so it becomes visible to couriers.
       P2pShipmentRequest opened = request;
       try {
         opened = await _repository.updateStatus(
@@ -89,6 +89,10 @@ class P2pShipmentBloc extends Bloc<P2pShipmentEvent, P2pShipmentState> {
       } catch (_) {
         opened = request;
       }
+      // Trigger matching algorithm — scores routes and notifies top couriers.
+      try {
+        await _repository.matchRequest(opened.id);
+      } catch (_) {}
       emit(state.copyWith(
         status: P2pShipmentStatus.success,
         requests: [opened, ...state.requests],

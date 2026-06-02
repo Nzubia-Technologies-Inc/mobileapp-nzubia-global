@@ -3,9 +3,11 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:customer_nzubia_global/features/p2p/domain/models/p2p_courier_profile.dart';
 import 'package:customer_nzubia_global/features/p2p/domain/models/p2p_courier_request.dart';
 import 'package:customer_nzubia_global/features/p2p/domain/models/p2p_route.dart';
+import 'package:customer_nzubia_global/features/p2p/domain/models/p2p_shipment_request.dart';
 import 'package:customer_nzubia_global/features/p2p/domain/enums/p2p_enums.dart';
 import 'package:customer_nzubia_global/features/p2p/domain/repositories/p2p_courier_repository.dart';
 import 'package:customer_nzubia_global/features/p2p/domain/repositories/p2p_route_repository.dart';
+import 'package:customer_nzubia_global/features/p2p/domain/repositories/p2p_shipment_repository.dart';
 
 part 'courier_dashboard_event.dart';
 part 'courier_dashboard_state.dart';
@@ -14,12 +16,15 @@ class CourierDashboardBloc
     extends Bloc<CourierDashboardEvent, CourierDashboardState> {
   final P2pCourierRepository _courierRepo;
   final P2pRouteRepository _routeRepo;
+  final P2pShipmentRepository _shipmentRepo;
 
   CourierDashboardBloc({
     required P2pCourierRepository courierRepository,
     required P2pRouteRepository routeRepository,
+    required P2pShipmentRepository shipmentRepository,
   })  : _courierRepo = courierRepository,
         _routeRepo = routeRepository,
+        _shipmentRepo = shipmentRepository,
         super(const CourierDashboardState()) {
     on<CourierDashboardLoadRequested>(_onLoadRequested);
     on<CourierDashboardAvailabilityToggled>(_onAvailabilityToggled);
@@ -69,12 +74,20 @@ class CourierDashboardBloc
         // Non-fatal — dashboard still works without requests.
       }
 
+      List<P2pShipmentRequest> activeShipments = const [];
+      try {
+        activeShipments = await _shipmentRepo.listAssignedShipments();
+      } catch (_) {
+        // Non-fatal — dashboard still works without active shipments.
+      }
+
       emit(state.copyWith(
         status: CourierDashboardStatus.success,
         profile: profile,
         myRoutes: myRoutes,
         activeRoute: activeRoute,
         pendingRequests: pendingRequests,
+        activeShipments: activeShipments,
       ));
     } catch (e) {
       emit(state.copyWith(

@@ -69,7 +69,10 @@ class ApiConstants {
   static String p2pShipmentMatch(String id) => '/p2p/shipments/$id/match';
   static String p2pShipmentReserve(String id) => '/p2p/shipments/$id/reserve';
   static String p2pShipmentHandoff(String id) => '/p2p/shipments/$id/handoff';
+  static String p2pShipmentPickup(String id) => '/p2p/shipments/$id/pickup';
   static String p2pShipmentDeliver(String id) => '/p2p/shipments/$id/deliver';
+  static String p2pShipmentComplete(String id) => '/p2p/shipments/$id/complete';
+  static String p2pShipmentDispute(String id) => '/p2p/shipments/$id/dispute';
   static String p2pShipmentOffers(String id) => '/p2p/shipments/$id/offers';
 
   // Offers (nested under shipments controller)

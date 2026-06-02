@@ -47,8 +47,18 @@ abstract class P2pShipmentRepository {
   /// Records the handoff — moves to HANDOFF_PENDING and opens a chat thread.
   Future<P2pShipmentRequest> recordHandoff(String requestId);
 
-  /// Confirms delivery — moves to DELIVERED.
-  Future<P2pShipmentRequest> confirmDelivery(String requestId);
+  /// Courier confirms pickup with the seeker's OTP and proof photos — moves to IN_TRANSIT.
+  Future<P2pShipmentRequest> recordPickup(
+    String shipmentId, {
+    required String pickupConfirmationCode,
+    required List<String> proofPhotoUrls,
+  });
+
+  /// Courier confirms delivery with proof photos — moves to DELIVERED.
+  Future<P2pShipmentRequest> confirmDelivery(
+    String requestId, {
+    List<String>? proofPhotoUrls,
+  });
 
   /// Seeker sends a direct booking request to a specific courier route.
   Future<void> sendCourierRequest(
@@ -59,4 +69,18 @@ abstract class P2pShipmentRepository {
 
   /// Lists the courier requests the seeker has sent for a specific shipment.
   Future<List<P2pCourierRequest>> listCourierRequests(String shipmentId);
+
+  /// Returns shipments where the authenticated courier is the assigned carrier.
+  /// Filters to active states: HANDOFF_PENDING, IN_TRANSIT, DELIVERED.
+  Future<List<P2pShipmentRequest>> listAssignedShipments();
+
+  /// Marks a DELIVERED shipment as COMPLETED (seeker confirms receipt).
+  Future<P2pShipmentRequest> completeShipment(String shipmentId);
+
+  /// Opens a dispute on a DELIVERED shipment.
+  Future<P2pShipmentRequest> raiseDispute(
+    String shipmentId, {
+    required String reason,
+    List<String>? evidenceUrls,
+  });
 }

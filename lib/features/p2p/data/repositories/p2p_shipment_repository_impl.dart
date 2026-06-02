@@ -180,10 +180,39 @@ class P2pShipmentRepositoryImpl implements P2pShipmentRepository {
   }
 
   @override
-  Future<P2pShipmentRequest> confirmDelivery(String requestId) async {
+  Future<P2pShipmentRequest> recordPickup(
+    String shipmentId, {
+    required String pickupConfirmationCode,
+    required List<String> proofPhotoUrls,
+  }) async {
     try {
-      final response =
-          await _client.dio.post(ApiConstants.p2pShipmentDeliver(requestId));
+      final response = await _client.dio.post(
+        ApiConstants.p2pShipmentPickup(shipmentId),
+        data: {
+          'pickupConfirmationCode': pickupConfirmationCode,
+          'proofPhotoUrls': proofPhotoUrls,
+        },
+      );
+      return P2pShipmentRequest.fromJson(
+        response.data as Map<String, dynamic>,
+      );
+    } on DioException catch (e) {
+      _handleDioError(e);
+    }
+  }
+
+  @override
+  Future<P2pShipmentRequest> confirmDelivery(
+    String requestId, {
+    List<String>? proofPhotoUrls,
+  }) async {
+    try {
+      final response = await _client.dio.post(
+        ApiConstants.p2pShipmentDeliver(requestId),
+        data: (proofPhotoUrls != null && proofPhotoUrls.isNotEmpty)
+            ? {'proofOfDeliveryUrls': proofPhotoUrls}
+            : null,
+      );
       return P2pShipmentRequest.fromJson(
         response.data as Map<String, dynamic>,
       );
@@ -220,6 +249,65 @@ class P2pShipmentRepositoryImpl implements P2pShipmentRepository {
       return list
           .map((e) => P2pCourierRequest.fromJson(e as Map<String, dynamic>))
           .toList();
+    } on DioException catch (e) {
+      _handleDioError(e);
+    }
+  }
+
+  @override
+  Future<List<P2pShipmentRequest>> listAssignedShipments() async {
+    try {
+      final response = await _client.dio.get(
+        ApiConstants.p2pShipments,
+        queryParameters: {'role': 'courier'},
+      );
+      final raw = response.data;
+      final list = raw is List ? raw : (raw as Map<String, dynamic>)['items'] as List? ?? const [];
+      final activeStatuses = {
+        'HANDOFF_PENDING',
+        'IN_TRANSIT',
+        'DELIVERED',
+      };
+      return list
+          .map((e) => P2pShipmentRequest.fromJson(e as Map<String, dynamic>))
+          .where((s) => activeStatuses.contains(s.status.toJson()))
+          .toList(growable: false);
+    } on DioException catch (e) {
+      _handleDioError(e);
+    }
+  }
+
+  @override
+  Future<P2pShipmentRequest> completeShipment(String shipmentId) async {
+    try {
+      final response =
+          await _client.dio.post(ApiConstants.p2pShipmentComplete(shipmentId));
+      return P2pShipmentRequest.fromJson(
+        response.data as Map<String, dynamic>,
+      );
+    } on DioException catch (e) {
+      _handleDioError(e);
+    }
+  }
+
+  @override
+  Future<P2pShipmentRequest> raiseDispute(
+    String shipmentId, {
+    required String reason,
+    List<String>? evidenceUrls,
+  }) async {
+    try {
+      final response = await _client.dio.post(
+        ApiConstants.p2pShipmentDispute(shipmentId),
+        data: {
+          'reason': reason,
+          if (evidenceUrls != null && evidenceUrls.isNotEmpty)
+            'evidenceUrls': evidenceUrls,
+        },
+      );
+      return P2pShipmentRequest.fromJson(
+        response.data as Map<String, dynamic>,
+      );
     } on DioException catch (e) {
       _handleDioError(e);
     }

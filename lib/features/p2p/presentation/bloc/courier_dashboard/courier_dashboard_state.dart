@@ -10,6 +10,11 @@ class CourierDashboardState extends Equatable {
 
   /// Direct requests from seekers that this courier needs to accept/decline.
   final List<P2pCourierRequest> pendingRequests;
+
+  /// Shipments where this courier is the assigned carrier and the status is
+  /// HANDOFF_PENDING, IN_TRANSIT, or DELIVERED.
+  final List<P2pShipmentRequest> activeShipments;
+
   final String? errorMessage;
 
   const CourierDashboardState({
@@ -18,6 +23,7 @@ class CourierDashboardState extends Equatable {
     this.activeRoute,
     this.myRoutes = const [],
     this.pendingRequests = const [],
+    this.activeShipments = const [],
     this.errorMessage,
   });
 
@@ -27,6 +33,7 @@ class CourierDashboardState extends Equatable {
     P2pRoute? activeRoute,
     List<P2pRoute>? myRoutes,
     List<P2pCourierRequest>? pendingRequests,
+    List<P2pShipmentRequest>? activeShipments,
     String? errorMessage,
   }) {
     return CourierDashboardState(
@@ -35,6 +42,7 @@ class CourierDashboardState extends Equatable {
       activeRoute: activeRoute ?? this.activeRoute,
       myRoutes: myRoutes ?? this.myRoutes,
       pendingRequests: pendingRequests ?? this.pendingRequests,
+      activeShipments: activeShipments ?? this.activeShipments,
       errorMessage: errorMessage ?? this.errorMessage,
     );
   }
@@ -46,6 +54,7 @@ class CourierDashboardState extends Equatable {
         activeRoute,
         myRoutes,
         pendingRequests,
+        activeShipments,
         errorMessage,
       ];
 }

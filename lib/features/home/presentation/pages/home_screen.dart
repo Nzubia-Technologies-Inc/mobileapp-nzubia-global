@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:get_it/get_it.dart';
 import 'package:go_router/go_router.dart';
+import 'package:customer_nzubia_global/core/theme/app_theme.dart';
 import 'package:customer_nzubia_global/core/utils/service_locator.dart';
 import 'package:customer_nzubia_global/core/theme/custom_theme_extension.dart';
 import 'package:customer_nzubia_global/core/widgets/glass_container.dart';
@@ -17,6 +19,7 @@ import 'package:customer_nzubia_global/features/shipment/domain/repositories/shi
 import 'package:customer_nzubia_global/l10n/app_localizations.dart';
 import 'package:customer_nzubia_global/core/widgets/offline_error_widget.dart';
 import 'package:customer_nzubia_global/core/network/socket_client.dart';
+import 'package:customer_nzubia_global/features/p2p/domain/repositories/p2p_courier_repository.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -254,6 +257,20 @@ class _HomeView extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: 16),
+
+                // P2P entry cards
+                Row(
+                  children: [
+                    Expanded(
+                      child: _P2pSendCard(
+                        onTap: () => context.push('/p2p/my-shipments'),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    const Expanded(child: _CourierModeCard()),
+                  ],
+                ),
+                const SizedBox(height: 8),
               ],
             ),
           ),
@@ -887,6 +904,187 @@ class _ShipmentGlassCard extends StatelessWidget {
             spreadRadius: 1,
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ── P2P Send entry card ────────────────────────────────────────────────────────
+
+class _P2pSendCard extends StatelessWidget {
+  final VoidCallback onTap;
+  const _P2pSendCard({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(14),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [
+              Colors.teal.withAlpha(30),
+              Colors.teal.withAlpha(12),
+            ],
+          ),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: Colors.teal.withAlpha(60)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: Colors.teal.withAlpha(40),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(
+                Icons.send_rounded,
+                color: Colors.teal,
+                size: 20,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Send via P2P',
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                      color: Colors.teal[700],
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'Ship with a traveler',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: Colors.teal[600],
+                      fontSize: 11,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(Icons.arrow_forward_ios_rounded,
+                size: 12, color: Colors.teal.withAlpha(180)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Courier Mode entry card ────────────────────────────────────────────────────
+
+class _CourierModeCard extends StatefulWidget {
+  const _CourierModeCard();
+
+  @override
+  State<_CourierModeCard> createState() => _CourierModeCardState();
+}
+
+class _CourierModeCardState extends State<_CourierModeCard> {
+  bool _checking = false;
+
+  Future<void> _handleTap() async {
+    if (_checking) return;
+    setState(() => _checking = true);
+    try {
+      final profile =
+          await GetIt.instance<P2pCourierRepository>().getMyProfile();
+      if (!mounted) return;
+      if (profile != null) {
+        context.push('/p2p/courier/dashboard');
+      } else {
+        context.push('/p2p/courier/onboarding');
+      }
+    } catch (_) {
+      if (mounted) context.push('/p2p/courier/onboarding');
+    } finally {
+      if (mounted) setState(() => _checking = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return InkWell(
+      onTap: _checking ? null : _handleTap,
+      borderRadius: BorderRadius.circular(14),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [
+              AppTheme.primaryColor.withAlpha(30),
+              AppTheme.primaryColor.withAlpha(12),
+            ],
+          ),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: AppTheme.primaryColor.withAlpha(60)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: AppTheme.primaryColor.withAlpha(40),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(
+                Icons.flight_takeoff_rounded,
+                color: AppTheme.primaryColor,
+                size: 22,
+              ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Courier Mode',
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                      color: AppTheme.primaryColor,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'Carry packages on your travels and earn income.',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: AppTheme.primaryColor.withOpacity(0.7),
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            _checking
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(
+                      color: AppTheme.primaryColor,
+                      strokeWidth: 2,
+                    ),
+                  )
+                : const Icon(
+                    Icons.arrow_forward_ios_rounded,
+                    size: 14,
+                    color: AppTheme.primaryColor,
+                  ),
+          ],
+        ),
       ),
     );
   }

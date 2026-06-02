@@ -110,6 +110,23 @@ Future<void> _initBackgroundServices() async {
              } else if (type == 'PAYMENT_SUCCESS') {
                 AppRouter.router.push('/payment/success');
              }
+             // ── P2P notification deep-links ─────────────────────────────────
+             else if ((type == 'P2P_OFFER_RECEIVED' || type == 'P2P_NEW_OFFER') && shipmentId != null) {
+                AppRouter.router.push('/p2p/shipment/$shipmentId/offers');
+             } else if (type == 'P2P_PICKUP_CONFIRMED' && shipmentId != null) {
+                AppRouter.router.push('/p2p/shipment/$shipmentId/tracking');
+             } else if (type == 'P2P_STATUS_UPDATE' && shipmentId != null) {
+                AppRouter.router.push('/p2p/shipment/$shipmentId/tracking');
+             } else if ((type == 'P2P_OFFER_ACCEPTED' || type == 'P2P_REQUEST_ACCEPTED') && shipmentId != null) {
+                // Courier: offer accepted → go straight to pickup screen
+                AppRouter.router.push('/p2p/courier/shipment/$shipmentId/pickup');
+             } else if (type == 'P2P_MATCHED_SHIPMENT') {
+                // Courier: new shipment matching their route
+                AppRouter.router.push('/p2p/courier/matched-shipments');
+             } else if (type == 'P2P_DIRECT_REQUEST') {
+                // Courier: seeker sent a direct booking request
+                AppRouter.router.push('/p2p/courier/requests');
+             }
           }
         });
       } catch (e, stackTrace) {

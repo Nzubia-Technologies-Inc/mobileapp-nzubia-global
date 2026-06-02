@@ -70,13 +70,14 @@ class _CreateShipmentViewState extends State<_CreateShipmentView> {
       listener: (context, state) {
         if (state.status == P2pShipmentStatus.success &&
             state.selectedRequest != null) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Shipment request submitted!'),
-              backgroundColor: AppTheme.primaryColor,
-            ),
+          final req = state.selectedRequest!;
+          context.pushReplacement(
+            '/p2p/shipment/${req.id}/offers',
+            extra: {
+              'destinationCity': req.destinationCity,
+              'destinationCountry': req.destinationCountry,
+            },
           );
-          context.pushReplacement('/p2p/shipment/${state.selectedRequest!.id}');
         }
         if (state.status == P2pShipmentStatus.failure) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -434,13 +435,6 @@ class _CreateShipmentViewState extends State<_CreateShipmentView> {
                     );
                   },
                 ),
-                const SizedBox(height: 12),
-                Center(
-                  child: TextButton(
-                    onPressed: _openCouriersByDestination,
-                    child: const Text('Browse couriers by destination'),
-                  ),
-                ),
                 const SizedBox(height: 16),
               ],
             ),
@@ -460,27 +454,6 @@ class _CreateShipmentViewState extends State<_CreateShipmentView> {
     final n = double.tryParse(v.toString());
     if (n == null || n <= 0) return 'Enter a positive number';
     return null;
-  }
-
-  void _openCouriersByDestination() {
-    final deliveryText = _deliveryController.text.trim();
-    final city = _deliveryCity.isNotEmpty
-        ? _deliveryCity
-        : (deliveryText.contains(',') ? deliveryText.split(',').first.trim() : deliveryText);
-    final country = _deliveryCountry.isNotEmpty
-        ? _deliveryCountry
-        : (deliveryText.contains(',') ? deliveryText.split(',').last.trim() : '');
-
-    final queryParameters = <String, String>{
-      if (city.isNotEmpty) 'destinationCity': city,
-      if (country.isNotEmpty) 'destinationCountry': country,
-    };
-
-    final query = queryParameters.isEmpty
-        ? ''
-        : '?${Uri(queryParameters: queryParameters).query}';
-
-    context.push('/p2p/couriers$query');
   }
 
   Future<void> _pickPhoto() async {
