@@ -28,6 +28,23 @@ class StripePaymentService implements PaymentService {
     }
   }
 
+  /// Use this when the PaymentIntent was already created server-side and you
+  /// have its client_secret (e.g. P2P offer acceptance flow).
+  Future<void> initPaymentSheetWithClientSecret(String clientSecret) async {
+    try {
+      await Stripe.instance.initPaymentSheet(
+        paymentSheetParameters: SetupPaymentSheetParameters(
+          paymentIntentClientSecret: clientSecret,
+          merchantDisplayName: 'Nzubia',
+          style: ThemeMode.light,
+          returnURL: 'nzubia://payment-success',
+        ),
+      );
+    } catch (e) {
+      throw Exception('Failed to initialize payment sheet: $e');
+    }
+  }
+
   @override
   Future<void> presentPaymentSheet() async {
     try {

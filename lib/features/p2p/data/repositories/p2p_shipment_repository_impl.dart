@@ -190,7 +190,7 @@ class P2pShipmentRepositoryImpl implements P2pShipmentRepository {
         ApiConstants.p2pShipmentPickup(shipmentId),
         data: {
           'pickupConfirmationCode': pickupConfirmationCode,
-          'proofPhotoUrls': proofPhotoUrls,
+          'pickupPhotoUrls': proofPhotoUrls,
         },
       );
       return P2pShipmentRequest.fromJson(
@@ -278,6 +278,19 @@ class P2pShipmentRepositoryImpl implements P2pShipmentRepository {
   }
 
   @override
+  Future<List<P2pShipmentRequest>> fetchNearbyShipments() async {
+    try {
+      final response = await _client.dio.get(ApiConstants.p2pCourierMeNearbyShipments);
+      final list = response.data as List;
+      return list
+          .map((e) => P2pShipmentRequest.fromJson(e as Map<String, dynamic>))
+          .toList(growable: false);
+    } on DioException catch (e) {
+      _handleDioError(e);
+    }
+  }
+
+  @override
   Future<P2pShipmentRequest> completeShipment(String shipmentId) async {
     try {
       final response =
@@ -330,7 +343,7 @@ class P2pShipmentRepositoryImpl implements P2pShipmentRepository {
       case 403:
         throw P2pException.forbidden(message);
       case 404:
-        throw P2pException.notFound('Shipment');
+        throw P2pException(statusCode: 404, message: message);
       case 409:
         throw P2pException.conflict(message);
       default:

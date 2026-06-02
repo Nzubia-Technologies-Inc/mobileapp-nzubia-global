@@ -155,13 +155,28 @@ class P2pShipmentBloc extends Bloc<P2pShipmentEvent, P2pShipmentState> {
   ) async {
     emit(state.copyWith(status: P2pShipmentStatus.loading));
     try {
-      await _repository.acceptOffer(event.offerId);
+      final accepted = await _repository.acceptOffer(event.offerId);
+      P2pShipmentState next;
       if (event.shipmentId != null) {
         final refreshed = await _repository.getRequest(event.shipmentId!);
-        _replaceSelected(emit, refreshed);
+        final updatedList = state.requests
+            .map((r) => r.id == refreshed.id ? refreshed : r)
+            .toList(growable: false);
+        next = state.copyWith(
+          status: P2pShipmentStatus.success,
+          selectedRequest: refreshed,
+          requests: updatedList,
+          pendingPaymentClientSecret: accepted.clientSecret,
+          pendingPaymentAmountUsd: accepted.offerAmountUsd,
+        );
       } else {
-        emit(state.copyWith(status: P2pShipmentStatus.success));
+        next = state.copyWith(
+          status: P2pShipmentStatus.success,
+          pendingPaymentClientSecret: accepted.clientSecret,
+          pendingPaymentAmountUsd: accepted.offerAmountUsd,
+        );
       }
+      emit(next);
     } catch (e) {
       emit(_fail(e));
     }
@@ -220,7 +235,7 @@ class P2pShipmentBloc extends Bloc<P2pShipmentEvent, P2pShipmentState> {
     Emitter<P2pShipmentState> emit,
   ) async {
     try {
-      final updated = await _repository.confirmDelivery(event.requestId);
+      final updated = await _repository.completeShipment(event.requestId);
       _replaceSelected(emit, updated);
     } catch (e) {
       emit(_fail(e));

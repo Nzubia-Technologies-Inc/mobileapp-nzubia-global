@@ -74,6 +74,9 @@ abstract class P2pShipmentRepository {
   /// Filters to active states: HANDOFF_PENDING, IN_TRANSIT, DELIVERED.
   Future<List<P2pShipmentRequest>> listAssignedShipments();
 
+  /// Returns OPEN shipment requests within 50 miles of the courier's home location.
+  Future<List<P2pShipmentRequest>> fetchNearbyShipments();
+
   /// Marks a DELIVERED shipment as COMPLETED (seeker confirms receipt).
   Future<P2pShipmentRequest> completeShipment(String shipmentId);
 

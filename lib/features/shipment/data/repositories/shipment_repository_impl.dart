@@ -219,7 +219,7 @@ class ShipmentRepositoryImpl implements ShipmentRepository {
   @override
   Future<ShipmentEntity> getShipment(String id) async {
     try {
-      final response = await _dioClient.dio.get('${ApiConstants.shipments}/$id/details');
+      final response = await _dioClient.dio.get('${ApiConstants.shipments}/$id');
       return ShipmentModel.fromJson(response.data);
     } on DioException {
       rethrow;

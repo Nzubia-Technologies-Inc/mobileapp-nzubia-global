@@ -108,7 +108,19 @@ class _AwaitingOffersViewState extends State<_AwaitingOffersView>
       listener: (context, state) {
         if (_accepting && state.status == P2pShipmentStatus.success) {
           setState(() => _accepting = false);
-          context.push('/p2p/shipment/${widget.shipmentId}/waiver');
+          final clientSecret = state.pendingPaymentClientSecret;
+          final amount = state.pendingPaymentAmountUsd;
+          if (clientSecret != null && amount != null && amount > 0) {
+            context.push(
+              '/p2p/shipment/${widget.shipmentId}/payment',
+              extra: {
+                'clientSecret': clientSecret,
+                'amountUsd': amount,
+              },
+            );
+          } else {
+            context.push('/p2p/shipment/${widget.shipmentId}/waiver');
+          }
         }
         if (_accepting && state.status == P2pShipmentStatus.failure) {
           setState(() => _accepting = false);

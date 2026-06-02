@@ -8,6 +8,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:customer_nzubia_global/core/constants/api_constants.dart';
 import 'package:customer_nzubia_global/core/network/dio_client.dart';
 import 'package:customer_nzubia_global/core/theme/app_theme.dart';
+import 'package:customer_nzubia_global/features/p2p/domain/models/p2p_shipment_request.dart';
 import 'package:customer_nzubia_global/features/p2p/domain/repositories/p2p_shipment_repository.dart';
 
 class CourierPickupScreen extends StatefulWidget {
@@ -32,7 +33,26 @@ class _CourierPickupScreenState extends State<CourierPickupScreen> {
   bool _submitting = false;
   String? _error;
 
+  P2pShipmentRequest? _shipment;
+  bool _loadingShipment = true;
+
   final _picker = ImagePicker();
+
+  @override
+  void initState() {
+    super.initState();
+    _loadShipment();
+  }
+
+  Future<void> _loadShipment() async {
+    try {
+      final repo = GetIt.instance<P2pShipmentRepository>();
+      final s = await repo.getRequest(widget.shipmentId);
+      if (mounted) setState(() { _shipment = s; _loadingShipment = false; });
+    } catch (_) {
+      if (mounted) setState(() => _loadingShipment = false);
+    }
+  }
 
   @override
   void dispose() {
@@ -170,6 +190,77 @@ class _CourierPickupScreenState extends State<CourierPickupScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // ── Pickup address ────────────────────────────────────────────
+            if (_loadingShipment)
+              Container(
+                height: 64,
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.surface,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                      color: theme.colorScheme.outline.withOpacity(0.4)),
+                ),
+                child: const Center(
+                  child: SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                        color: AppTheme.primaryColor, strokeWidth: 2),
+                  ),
+                ),
+              )
+            else if (_shipment != null) ...[
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: AppTheme.primaryColor.withAlpha(14),
+                  borderRadius: BorderRadius.circular(12),
+                  border:
+                      Border.all(color: AppTheme.primaryColor.withAlpha(50)),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Icon(Icons.location_on,
+                        color: AppTheme.primaryColor, size: 22),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Pickup address',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: AppTheme.primaryColor,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 11,
+                            ),
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            _shipment!.originAddress,
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Meet the seeker here to collect the package.',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.onSurface
+                                  .withOpacity(0.55),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+            const SizedBox(height: 20),
+
             Text(
               'Enter the 6-digit code shown on the seeker\'s app',
               style: theme.textTheme.bodyMedium?.copyWith(

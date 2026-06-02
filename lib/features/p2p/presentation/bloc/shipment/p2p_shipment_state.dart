@@ -12,6 +12,11 @@ class P2pShipmentState {
   /// Courier requests the seeker sent for the currently selected shipment.
   final List<P2pCourierRequest> courierRequests;
   final String? errorMessage;
+  /// Stripe PaymentIntent client_secret emitted once after a successful offer
+  /// acceptance. The screen must consume it (navigate to payment) and clear it.
+  final String? pendingPaymentClientSecret;
+  /// The accepted offer amount in USD, carried alongside the client_secret.
+  final double? pendingPaymentAmountUsd;
 
   const P2pShipmentState({
     this.status = P2pShipmentStatus.initial,
@@ -21,6 +26,8 @@ class P2pShipmentState {
     this.matches = const [],
     this.courierRequests = const [],
     this.errorMessage,
+    this.pendingPaymentClientSecret,
+    this.pendingPaymentAmountUsd,
   });
 
   P2pShipmentState copyWith({
@@ -31,6 +38,9 @@ class P2pShipmentState {
     List<P2pRouteFeedItem>? matches,
     List<P2pCourierRequest>? courierRequests,
     String? errorMessage,
+    String? pendingPaymentClientSecret,
+    double? pendingPaymentAmountUsd,
+    bool clearPendingPayment = false,
   }) {
     return P2pShipmentState(
       status: status ?? this.status,
@@ -40,6 +50,12 @@ class P2pShipmentState {
       matches: matches ?? this.matches,
       courierRequests: courierRequests ?? this.courierRequests,
       errorMessage: errorMessage ?? this.errorMessage,
+      pendingPaymentClientSecret: clearPendingPayment
+          ? null
+          : (pendingPaymentClientSecret ?? this.pendingPaymentClientSecret),
+      pendingPaymentAmountUsd: clearPendingPayment
+          ? null
+          : (pendingPaymentAmountUsd ?? this.pendingPaymentAmountUsd),
     );
   }
 }

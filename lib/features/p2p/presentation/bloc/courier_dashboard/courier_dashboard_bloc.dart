@@ -31,6 +31,7 @@ class CourierDashboardBloc
     on<CourierDashboardRoutePublishRequested>(_onRoutePublishRequested);
     on<CourierDashboardRequestAccepted>(_onRequestAccepted);
     on<CourierDashboardRequestDeclined>(_onRequestDeclined);
+    on<CourierDashboardLocationUpdated>(_onLocationUpdated);
   }
 
   Future<void> _onLoadRequested(
@@ -180,6 +181,27 @@ class CourierDashboardBloc
       emit(state.copyWith(
         status: CourierDashboardStatus.failure,
         errorMessage: e.toString(),
+      ));
+    }
+  }
+
+  Future<void> _onLocationUpdated(
+    CourierDashboardLocationUpdated event,
+    Emitter<CourierDashboardState> emit,
+  ) async {
+    final previous = state.profile;
+    if (previous == null) return;
+    try {
+      final updated = await _courierRepo.updateProfile({
+        'homeLatitude': event.latitude,
+        'homeLongitude': event.longitude,
+      });
+      emit(state.copyWith(profile: updated));
+    } catch (e) {
+      emit(state.copyWith(
+        status: CourierDashboardStatus.failure,
+        errorMessage: e.toString(),
+        profile: previous,
       ));
     }
   }

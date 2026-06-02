@@ -220,8 +220,24 @@ class _ShipmentCard extends StatelessWidget {
                 ],
               ),
             ],
-            if (shipment.status == ShipmentRequestStatus.matched ||
-                shipment.status == ShipmentRequestStatus.reserved) ...[
+            if (shipment.status == ShipmentRequestStatus.matched) ...[
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Icon(Icons.description_outlined,
+                      size: 13, color: Colors.green[700]),
+                  const SizedBox(width: 4),
+                  Text(
+                    'Matched! Tap to sign the waiver',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                        color: Colors.green[700],
+                        fontSize: 11,
+                        fontWeight: FontWeight.w500),
+                  ),
+                ],
+              ),
+            ],
+            if (shipment.status == ShipmentRequestStatus.reserved) ...[
               const SizedBox(height: 8),
               Row(
                 children: [
@@ -229,7 +245,7 @@ class _ShipmentCard extends StatelessWidget {
                       size: 13, color: Colors.green[700]),
                   const SizedBox(width: 4),
                   Text(
-                    'Matched! Tap to coordinate handoff',
+                    'Reserved! Tap to get handoff code',
                     style: theme.textTheme.bodySmall?.copyWith(
                         color: Colors.green[700],
                         fontSize: 11,
@@ -250,6 +266,7 @@ class _ShipmentCard extends StatelessWidget {
       case ShipmentRequestStatus.draft:
         return '/p2p/shipment/${s.id}/offers';
       case ShipmentRequestStatus.matched:
+        return '/p2p/shipment/${s.id}/waiver';
       case ShipmentRequestStatus.reserved:
         return '/p2p/shipment/${s.id}/handoff';
       case ShipmentRequestStatus.handoffPending:

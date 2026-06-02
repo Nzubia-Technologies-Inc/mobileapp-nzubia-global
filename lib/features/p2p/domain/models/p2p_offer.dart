@@ -14,6 +14,9 @@ class P2pOffer extends Equatable {
   final DateTime? expiresAt;
   final String? paymentReference;
   final String? paymentStatus;
+  /// Only populated immediately after offer acceptance — holds the Stripe
+  /// PaymentIntent client_secret needed to complete the payment on the client.
+  final String? clientSecret;
   final DateTime? createdAt;
   final DateTime? updatedAt;
 
@@ -29,6 +32,7 @@ class P2pOffer extends Equatable {
     this.expiresAt,
     this.paymentReference,
     this.paymentStatus,
+    this.clientSecret,
     this.createdAt,
     this.updatedAt,
   });
@@ -51,6 +55,7 @@ class P2pOffer extends Equatable {
       expiresAt: parseDate(json['expires_at']),
       paymentReference: json['payment_reference'] as String?,
       paymentStatus: json['payment_status'] as String?,
+      clientSecret: json['client_secret'] as String?,
       createdAt: parseDate(json['created_at']),
       updatedAt: parseDate(json['updated_at']),
     );
@@ -69,6 +74,7 @@ class P2pOffer extends Equatable {
         expiresAt,
         paymentReference,
         paymentStatus,
+        clientSecret,
         createdAt,
         updatedAt,
       ];

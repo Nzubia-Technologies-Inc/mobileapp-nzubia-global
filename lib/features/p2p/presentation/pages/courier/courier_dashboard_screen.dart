@@ -10,6 +10,7 @@ import 'package:customer_nzubia_global/features/p2p/domain/models/p2p_route.dart
 import 'package:customer_nzubia_global/features/p2p/domain/models/p2p_courier_request.dart';
 import 'package:customer_nzubia_global/features/p2p/domain/models/p2p_shipment_request.dart';
 import 'package:customer_nzubia_global/features/p2p/presentation/bloc/courier_dashboard/courier_dashboard_bloc.dart';
+import 'package:customer_nzubia_global/features/p2p/presentation/pages/courier/courier_location_sheet.dart';
 
 class CourierDashboardScreen extends StatelessWidget {
   const CourierDashboardScreen({super.key});
@@ -189,6 +190,7 @@ class _DashboardView extends StatelessWidget {
                                     .push('/p2p/courier/matched-shipments'),
                               ),
                             ),
+                            /*
                             const SizedBox(width: 10),
                             Expanded(
                               child: OutlinedButton.icon(
@@ -203,6 +205,7 @@ class _DashboardView extends StatelessWidget {
                                     context.push('/p2p/courier/requests'),
                               ),
                             ),
+                            */
                           ],
                         ),
                         const SizedBox(height: 16),
@@ -235,6 +238,21 @@ class _DashboardView extends StatelessWidget {
 }
 
 // ─── Profile card ─────────────────────────────────────────────────────────────
+
+void _showLocationSheet(BuildContext context, P2pCourierProfile profile) {
+  showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
+    builder: (_) => BlocProvider.value(
+      value: context.read<CourierDashboardBloc>(),
+      child: CourierLocationSheet(
+        currentLatitude: profile.homeLatitude,
+        currentLongitude: profile.homeLongitude,
+      ),
+    ),
+  );
+}
 
 class _ProfileCard extends StatelessWidget {
   final P2pCourierProfile profile;
@@ -304,6 +322,40 @@ class _ProfileCard extends StatelessWidget {
                         fontSize: 11,
                         fontWeight: FontWeight.w600,
                       ),
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  GestureDetector(
+                    onTap: () => _showLocationSheet(context, profile),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          profile.homeLatitude != null
+                              ? Icons.location_on
+                              : Icons.add_location_outlined,
+                          size: 13,
+                          color: profile.homeLatitude != null
+                              ? AppTheme.primaryColor
+                              : theme.colorScheme.onSurface.withOpacity(0.45),
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          profile.homeLatitude != null
+                              ? 'Location set'
+                              : 'Set home location',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: profile.homeLatitude != null
+                                ? AppTheme.primaryColor
+                                : theme.colorScheme.onSurface.withOpacity(0.45),
+                            fontWeight: FontWeight.w500,
+                            decoration: TextDecoration.underline,
+                            decorationColor: profile.homeLatitude != null
+                                ? AppTheme.primaryColor
+                                : theme.colorScheme.onSurface.withOpacity(0.45),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
@@ -1362,19 +1414,46 @@ class _ActiveShipmentTile extends StatelessWidget {
             ),
             if (shipment.status == ShipmentRequestStatus.handoffPending) ...[
               const SizedBox(height: 10),
-              Row(
-                children: [
-                  const Icon(Icons.timer_outlined,
-                      size: 14, color: Colors.orange),
-                  const SizedBox(width: 6),
-                  Text(
-                    'Awaiting package handoff from sender',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: Colors.orange[800],
-                      fontWeight: FontWeight.w500,
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: AppTheme.primaryColor.withAlpha(12),
+                  borderRadius: BorderRadius.circular(8),
+                  border:
+                      Border.all(color: AppTheme.primaryColor.withAlpha(40)),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Icon(Icons.location_on,
+                        size: 16, color: AppTheme.primaryColor),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Meet sender to collect package',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: AppTheme.primaryColor,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 11,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            shipment.originAddress,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              fontWeight: FontWeight.w500,
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ],
           ],

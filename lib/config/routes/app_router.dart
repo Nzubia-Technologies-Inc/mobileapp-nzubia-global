@@ -26,6 +26,7 @@ import 'package:customer_nzubia_global/features/p2p/presentation/pages/shipment/
 import 'package:customer_nzubia_global/features/p2p/presentation/pages/shipment/p2p_handoff_screen.dart';
 import 'package:customer_nzubia_global/features/p2p/presentation/pages/shipment/p2p_tracking_screen.dart';
 import 'package:customer_nzubia_global/features/p2p/presentation/pages/shipment/p2p_review_screen.dart';
+import 'package:customer_nzubia_global/features/p2p/presentation/pages/shipment/p2p_payment_screen.dart';
 import 'package:customer_nzubia_global/features/p2p/presentation/pages/compliance_screen.dart';
 
 import 'package:customer_nzubia_global/features/auth/presentation/pages/splash_screen.dart';
@@ -244,6 +245,20 @@ class AppRouter {
             shipmentId: id,
             destinationCity: extra?['destinationCity'] as String?,
             destinationCountry: extra?['destinationCountry'] as String?,
+          );
+        },
+      ),
+      GoRoute(
+        path: '/p2p/shipment/:id/payment',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) {
+          final id = state.pathParameters['id']!;
+          final extra = state.extra as Map<String, dynamic>? ?? {};
+          return P2pPaymentScreen(
+            shipmentId: id,
+            clientSecret: extra['clientSecret'] as String? ?? '',
+            amountUsd: (extra['amountUsd'] as num?)?.toDouble() ?? 0,
+            courierName: extra['courierName'] as String?,
           );
         },
       ),

@@ -2,7 +2,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:get_it/get_it.dart';
 import 'package:customer_nzubia_global/core/theme/app_theme.dart';
-import 'package:customer_nzubia_global/features/p2p/domain/enums/p2p_enums.dart';
 import 'package:customer_nzubia_global/features/p2p/domain/models/p2p_shipment_request.dart';
 import 'package:customer_nzubia_global/features/p2p/domain/repositories/p2p_shipment_repository.dart';
 import 'package:customer_nzubia_global/features/p2p/presentation/pages/courier/courier_offer_sheet.dart';
@@ -43,14 +42,10 @@ class _CourierMatchedShipmentsScreenState
       _error = null;
     });
     try {
-      final all = await _repo.listRequests();
+      final items = await _repo.fetchNearbyShipments();
       if (!mounted) return;
       setState(() {
-        _items = all
-            .where((s) =>
-                s.status == ShipmentRequestStatus.open ||
-                s.status == ShipmentRequestStatus.matched)
-            .toList();
+        _items = items;
         _loading = false;
       });
     } catch (e) {

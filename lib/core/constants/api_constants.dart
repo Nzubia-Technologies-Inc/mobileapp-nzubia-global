@@ -87,6 +87,9 @@ class ApiConstants {
 
   // Courier incoming requests (courier accepts/declines seeker's direct requests)
   static const String p2pCourierMeRequests = '/p2p/couriers/me/requests';
+
+  // Courier browse: OPEN shipments within 50 miles of courier's home location
+  static const String p2pCourierMeNearbyShipments = '/p2p/couriers/me/nearby-shipments';
   static String p2pCourierRequestAccept(String id) =>
       '/p2p/couriers/me/requests/$id/accept';
   static String p2pCourierRequestDecline(String id) =>

@@ -37,3 +37,12 @@ class CourierDashboardRequestDeclined extends CourierDashboardEvent {
     this.reason,
   });
 }
+
+class CourierDashboardLocationUpdated extends CourierDashboardEvent {
+  final double latitude;
+  final double longitude;
+  const CourierDashboardLocationUpdated({
+    required this.latitude,
+    required this.longitude,
+  });
+}
